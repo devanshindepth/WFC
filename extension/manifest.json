@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Text Extractor Pro",
+  "version": "1.0",
+  "description": "Extract text from images, PDFs, and web pages",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Extract Text"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["viewer.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

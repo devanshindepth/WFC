@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Text Extractor - Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            padding: 20px;
+            color: #e5e5e5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            border-radius: 12px;
+            border: 1px solid #2a2a2a;
+            overflow: hidden;
+            min-height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: #1a1a1a;
+            color: #ffffff;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            padding: 10px 16px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 6px;
+            color: #e5e5e5;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .btn:hover {
+            background: #333333;
+            border-color: #4a4a4a;
+            color: #ffffff;
+        }
+        
+        .content {
+            flex: 1;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .text-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+        }
+        
+        .text-stats {
+            display: flex;
+            gap: 24px;
+            font-size: 14px;
+            color: #a3a3a3;
+        }
+        
+        .text-display {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 24px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-y: auto;
+            color: #e5e5e5;
+            min-height: 300px;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 16px;
+            color: #a3a3a3;
+        }
+        
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #2a2a2a;
+            border-top: 3px solid #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 64px 32px;
+            color: #a3a3a3;
+        }
+        
+        .empty-state h2 {
+            margin-bottom: 12px;
+            color: #e5e5e5;
+            font-weight: 600;
+        }
+        
+        .search-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            font-size: 14px;
+            background: #1a1a1a;
+            color: #e5e5e5;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #4a4a4a;
+            background: #2a2a2a;
+        }
+        
+        .search-input::placeholder {
+            color: #666666;
+        }
+        
+        .highlight {
+            background-color: #fbbf24;
+            color: #000000;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+            
+            .header {
+                padding: 20px 24px;
+                flex-direction: column;
+                gap: 16px;
+            }
+            
+            .content {
+                padding: 24px;
+            }
+            
+            .text-info {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="viewerTitle">Extracted Text</h1>
+            <div class="header-actions">
+                <button id="copyBtn" class="btn">Copy</button>
+                <button id="downloadBtn" class="btn">Download</button>
+                <button id="closeBtn" class="btn">Close</button>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="search-bar">
+                <input type="text" id="searchInput" class="search-input" placeholder="Search in text...">
+                <button id="searchBtn" class="btn">Search</button>
+                <button id="clearSearchBtn" class="btn">Clear</button>
+            </div>
+            
+            <div id="textInfo" class="text-info" style="display: none;">
+                <div>
+                    <strong id="sourceTitle">Source</strong>
+                    <div id="timestamp" style="font-size: 12px; color: #a3a3a3; margin-top: 4px;"></div>
+                </div>
+                <div class="text-stats">
+                    <span>Characters: <strong id="charCount">0</strong></span>
+                    <span>Words: <strong id="wordCount">0</strong></span>
+                    <span>Lines: <strong id="lineCount">0</strong></span>
+                </div>
+            </div>
+            
+            <div id="loadingState" class="loading">
+                <div class="spinner"></div>
+                Loading extracted text...
+            </div>
+            
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <h2>No Text Available</h2>
+                <p>No extracted text found. Please extract some text first.</p>
+            </div>
+            
+            <div id="textDisplay" class="text-display" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script src="viewer.js"></script>
+</body>
+</html>

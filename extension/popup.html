@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 300px;
+            padding: 24px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #e5e5e5;
+            margin: 0;
+        }
+        
+        h1 {
+            margin: 0 0 24px 0;
+            font-size: 20px;
+            font-weight: 600;
+            text-align: center;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+        }
+        
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px 16px;
+            margin: 0 0 12px 0;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            color: #e5e5e5;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+        
+        .btn:hover {
+            background: #333333;
+            border-color: #4a4a4a;
+            color: #ffffff;
+        }
+        
+        .btn:active {
+            background: #2a2a2a;
+            transform: scale(0.98);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 13px;
+            min-height: 20px;
+            border: 1px solid transparent;
+        }
+        
+        .status.loading {
+            background: #2a1f0a;
+            border-color: #3d2e14;
+            color: #fbbf24;
+        }
+        
+        .status.success {
+            background: #0a2a14;
+            border-color: #14472a;
+            color: #22c55e;
+        }
+        
+        .status.error {
+            background: #2a0a0a;
+            border-color: #472014;
+            color: #ef4444;
+        }
+        
+        .divider {
+            height: 1px;
+            background: #3a3a3a;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Text Extractor</h1>
+    
+    <button id="extractPage" class="btn">Extract Page Text</button>
+    <button id="extractSelection" class="btn">Extract Selection</button>
+    
+    <div class="divider"></div>
+    
+    <!-- <button id="uploadImage" class="btn">Upload Image</button>
+    <input type="file" id="imageFile" class="file-input" accept="image/*">
+    
+    <button id="uploadPdf" class="btn">Upload PDF</button>
+    <input type="file" id="pdfFile" class="file-input" accept=".pdf"> -->
+    
+    <div id="status" class="status"></div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
