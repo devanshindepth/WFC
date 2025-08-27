@@ -1,4 +1,4 @@
-// Viewer script for displaying extracted text
+// Updated TextViewer class for displaying extracted text and files
 
 class TextViewer {
     constructor() {
@@ -12,44 +12,21 @@ class TextViewer {
 
     initializeElements() {
         this.elements = {
-            viewerTitle: document.getElementById('viewerTitle'),
+            welcomeMessage: document.getElementById('welcomeMessage'),
+            contentArea: document.getElementById('contentArea'),
             textInfo: document.getElementById('textInfo'),
             sourceTitle: document.getElementById('sourceTitle'),
             timestamp: document.getElementById('timestamp'),
             charCount: document.getElementById('charCount'),
             wordCount: document.getElementById('wordCount'),
             lineCount: document.getElementById('lineCount'),
-            loadingState: document.getElementById('loadingState'),
-            emptyState: document.getElementById('emptyState'),
-            textDisplay: document.getElementById('textDisplay'),
-            searchInput: document.getElementById('searchInput'),
-            searchBtn: document.getElementById('searchBtn'),
-            clearSearchBtn: document.getElementById('clearSearchBtn'),
-            copyBtn: document.getElementById('copyBtn'),
-            downloadBtn: document.getElementById('downloadBtn'),
-            closeBtn: document.getElementById('closeBtn')
+            extractedTextDisplay: document.getElementById('extractedTextDisplay'),
+            messageInput: document.getElementById('messageInput'),
+            sendButton: document.getElementById('sendButton')
         };
     }
 
     initializeEventListeners() {
-        this.elements.copyBtn.addEventListener('click', () => this.copyText());
-        this.elements.downloadBtn.addEventListener('click', () => this.downloadText());
-        this.elements.closeBtn.addEventListener('click', () => window.close());
-        this.elements.searchBtn.addEventListener('click', () => this.searchText());
-        this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
-        
-        this.elements.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.searchText();
-            }
-        });
-
-        this.elements.searchInput.addEventListener('input', (e) => {
-            if (e.target.value === '') {
-                this.clearSearch();
-            }
-        });
-
         // Handle keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey || e.metaKey) {
@@ -64,48 +41,46 @@ class TextViewer {
                         e.preventDefault();
                         this.downloadText();
                         break;
-                    case 'f':
-                        e.preventDefault();
-                        this.elements.searchInput.focus();
-                        break;
-                }
-            } else if (e.key === 'Escape') {
-                if (this.elements.searchInput === document.activeElement) {
-                    this.clearSearch();
-                } else {
-                    window.close();
                 }
             }
+        });
+
+        // Auto-resize textarea
+        this.elements.messageInput.addEventListener('input', () => {
+            this.autoResizeTextarea();
         });
     }
 
     async loadExtractedText() {
         try {
-            const data = await chrome.storage.local.get(['extractedText', 'extractedTitle', 'timestamp']);
+            const data = await chrome.storage.local.get(['extractedText', 'extractedTitle', 'timestamp', 'fileData', 'fileType']);
             
-            if (data.extractedText) {
-                this.originalText = data.extractedText;
-                this.displayText(data.extractedText, data.extractedTitle || 'Extracted Text', data.timestamp);
-            } else {
-                this.showEmptyState();
+            if (data.extractedText || data.fileData) {
+                this.hideWelcomeMessage();
+                
+                if (data.fileData && (data.fileType === 'pdf' || data.fileType === 'image')) {
+                    this.displayFile(data.fileData, data.fileType, data.extractedTitle || 'Uploaded File', data.timestamp);
+                } else if (data.extractedText) {
+                    this.displayText(data.extractedText, data.extractedTitle || 'Extracted Text', data.timestamp);
+                }
             }
         } catch (error) {
-            console.error('Error loading extracted text:', error);
-            this.showEmptyState();
+            console.error('Error loading extracted content:', error);
         }
     }
 
+    hideWelcomeMessage() {
+        this.elements.welcomeMessage.style.display = 'none';
+    }
+
     displayText(text, title, timestamp) {
-        // Hide loading state
-        this.elements.loadingState.style.display = 'none';
-        this.elements.emptyState.style.display = 'none';
+        this.originalText = text;
         
         // Show content
         this.elements.textInfo.style.display = 'flex';
-        this.elements.textDisplay.style.display = 'block';
+        this.elements.extractedTextDisplay.style.display = 'block';
         
         // Update title and info
-        this.elements.viewerTitle.textContent = title;
         this.elements.sourceTitle.textContent = title;
         
         if (timestamp) {
@@ -120,17 +95,55 @@ class TextViewer {
         this.elements.lineCount.textContent = stats.lines.toLocaleString();
         
         // Display text
-        this.elements.textDisplay.textContent = text;
+        this.elements.extractedTextDisplay.textContent = text;
         
         // Update document title
         document.title = `Text Extractor - ${title}`;
     }
 
-    showEmptyState() {
-        this.elements.loadingState.style.display = 'none';
-        this.elements.textInfo.style.display = 'none';
-        this.elements.textDisplay.style.display = 'none';
-        this.elements.emptyState.style.display = 'block';
+    displayFile(fileData, fileType, title, timestamp) {
+        this.hideWelcomeMessage();
+        
+        // Show content info
+        this.elements.textInfo.style.display = 'flex';
+        this.elements.extractedTextDisplay.style.display = 'block';
+        
+        // Update title and info
+        this.elements.sourceTitle.textContent = title;
+        
+        if (timestamp) {
+            const date = new Date(timestamp);
+            this.elements.timestamp.textContent = `Uploaded on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`;
+        }
+
+        // Clear text stats for files
+        this.elements.charCount.textContent = '-';
+        this.elements.wordCount.textContent = '-';
+        this.elements.lineCount.textContent = '-';
+        
+        // Create file viewer
+        this.elements.extractedTextDisplay.innerHTML = '';
+        
+        if (fileType === 'image') {
+            const img = document.createElement('img');
+            img.src = fileData;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.border = '1px solid #3a3a3a';
+            img.style.borderRadius = '8px';
+            this.elements.extractedTextDisplay.appendChild(img);
+        } else if (fileType === 'pdf') {
+            const iframe = document.createElement('iframe');
+            iframe.src = fileData;
+            iframe.style.width = '100%';
+            iframe.style.height = '60vh';
+            iframe.style.border = '1px solid #3a3a3a';
+            iframe.style.borderRadius = '8px';
+            this.elements.extractedTextDisplay.appendChild(iframe);
+        }
+        
+        // Update document title
+        document.title = `Text Extractor - ${title}`;
     }
 
     calculateTextStats(text) {
@@ -141,118 +154,21 @@ class TextViewer {
         return { characters, words, lines };
     }
 
-    searchText() {
-        const searchTerm = this.elements.searchInput.value.trim();
-        
-        if (!searchTerm || !this.originalText) {
-            return;
-        }
-
-        this.clearSearch();
-        
-        // Find all matches (case-insensitive)
-        const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        const matches = [...this.originalText.matchAll(regex)];
-        
-        if (matches.length === 0) {
-            this.showSearchResults(0);
-            return;
-        }
-
-        // Highlight matches
-        let highlightedText = this.originalText;
-        let offset = 0;
-        
-        matches.forEach((match, index) => {
-            const start = match.index + offset;
-            const end = start + match[0].length;
-            const highlightedMatch = `<span class="highlight" data-match="${index}">${match[0]}</span>`;
-            
-            highlightedText = highlightedText.slice(0, start) + 
-                             highlightedMatch + 
-                             highlightedText.slice(end);
-            
-            offset += highlightedMatch.length - match[0].length;
-        });
-        
-        this.elements.textDisplay.innerHTML = highlightedText;
-        this.searchMatches = matches;
-        this.showSearchResults(matches.length);
-        
-        // Scroll to first match
-        if (matches.length > 0) {
-            this.scrollToMatch(0);
-        }
-    }
-
-    clearSearch() {
-        this.elements.searchInput.value = '';
-        this.elements.textDisplay.innerHTML = '';
-        this.elements.textDisplay.textContent = this.originalText;
-        this.searchMatches = [];
-        this.currentMatchIndex = -1;
-        this.showSearchResults(0);
-    }
-
-    showSearchResults(count) {
-        if (count > 0) {
-            this.elements.searchBtn.textContent = `🔍 Found ${count}`;
-            this.elements.searchBtn.style.background = 'rgba(40, 167, 69, 0.2)';
-        } else if (this.elements.searchInput.value.trim()) {
-            this.elements.searchBtn.textContent = '🔍 No matches';
-            this.elements.searchBtn.style.background = 'rgba(220, 53, 69, 0.2)';
-        } else {
-            this.elements.searchBtn.textContent = '🔍 Search';
-            this.elements.searchBtn.style.background = '';
-        }
-    }
-
-    scrollToMatch(index) {
-        const matchElement = document.querySelector(`[data-match="${index}"]`);
-        if (matchElement) {
-            matchElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            this.currentMatchIndex = index;
-        }
+    autoResizeTextarea() {
+        const textarea = this.elements.messageInput;
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
     }
 
     async copyText() {
         try {
             const textToCopy = window.getSelection().toString() || this.originalText;
+            if (!textToCopy) return;
+            
             await navigator.clipboard.writeText(textToCopy);
-            
-            // Visual feedback
-            const originalText = this.elements.copyBtn.textContent;
-            this.elements.copyBtn.textContent = '✅ Copied!';
-            this.elements.copyBtn.style.background = 'rgba(40, 167, 69, 0.3)';
-            
-            setTimeout(() => {
-                this.elements.copyBtn.textContent = originalText;
-                this.elements.copyBtn.style.background = '';
-            }, 2000);
-            
+            console.log('Text copied to clipboard');
         } catch (error) {
             console.error('Failed to copy text:', error);
-            
-            // Fallback for older browsers
-            const textArea = document.createElement('textarea');
-            textArea.value = window.getSelection().toString() || this.originalText;
-            document.body.appendChild(textArea);
-            textArea.select();
-            
-            try {
-                document.execCommand('copy');
-                this.elements.copyBtn.textContent = '✅ Copied!';
-                this.elements.copyBtn.style.background = 'rgba(40, 167, 69, 0.3)';
-                
-                setTimeout(() => {
-                    this.elements.copyBtn.textContent = '📋 Copy';
-                    this.elements.copyBtn.style.background = '';
-                }, 2000);
-            } catch (fallbackError) {
-                console.error('Fallback copy also failed:', fallbackError);
-            }
-            
-            document.body.removeChild(textArea);
         }
     }
 
@@ -274,16 +190,6 @@ class TextViewer {
         // Cleanup
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
-        // Visual feedback
-        const originalText = this.elements.downloadBtn.textContent;
-        this.elements.downloadBtn.textContent = '✅ Downloaded!';
-        this.elements.downloadBtn.style.background = 'rgba(40, 167, 69, 0.3)';
-        
-        setTimeout(() => {
-            this.elements.downloadBtn.textContent = originalText;
-            this.elements.downloadBtn.style.background = '';
-        }, 2000);
     }
 }
 
