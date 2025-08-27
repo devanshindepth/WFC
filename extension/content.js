@@ -15,45 +15,48 @@ class ContentExtractor {
             return true; // Keep message channel open for async responses
         });
 
-        // Add keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.altKey) {
-                switch (e.key) {
-                    case 'e':
-                        e.preventDefault();
-                        this.extractPageText();
-                        break;
-                    case 's':
-                        e.preventDefault();
-                        this.extractSelection();
-                        break;
-                }
-            }
-        });
-
         this.isInitialized = true;
     }
 
     handleMessage(request, sender, sendResponse) {
-        switch (request.action) {
-            case 'extractPageText':
-                this.extractPageText().then(sendResponse);
-                break;
-            case 'extractSelection':
+    switch (request.action) {
+        case 'extractPageText':
+            this.extractPageText().then(sendResponse);
+            return true;
+        case 'extractSelection':
+            this.extractSelection().then(sendResponse);
+            return true;
+        case 'extractText': // Handle context menu action
+            if (request.selectedText) {
+                // Extract selection if text was selected
                 this.extractSelection().then(sendResponse);
-                break;
-            case 'highlightText':
-                this.highlightText(request.text);
-                sendResponse({ success: true });
-                break;
-            default:
-                sendResponse({ error: 'Unknown action' });
-        }
+            } else {
+                // Extract full page if no selection
+                this.extractPageText().then(sendResponse);
+            }
+            return true; // Keep message channel open for async response
+        case 'highlightText':
+            this.highlightText(request.text);
+            sendResponse({ success: true });
+            break;
+        default:
+            sendResponse({ error: 'Unknown action' });
     }
+}
 
     async extractPageText() {
         try {
             const extractedText = this.getPageText();
+            
+            // Send to background script
+            chrome.runtime.sendMessage({
+                action: "textExtracted",
+                text: extractedText,
+                title: document.title,
+                url: window.location.href,
+                source: 'page'
+            });
+            
             return {
                 success: true,
                 text: extractedText,
@@ -81,6 +84,15 @@ class ContentExtractor {
                 };
             }
 
+            // Send to background script
+            chrome.runtime.sendMessage({
+                action: "textExtracted",
+                text: selectedText,
+                title: document.title,
+                url: window.location.href,
+                source: 'selection'
+            });
+            
             return {
                 success: true,
                 text: selectedText,
@@ -241,52 +253,6 @@ class ContentExtractor {
                 parent.removeChild(highlight);
             }
         });
-    }
-
-    // Utility method to extract text from images using canvas (basic implementation)
-    async extractTextFromCanvas(canvas) {
-        // This is a placeholder for OCR functionality
-        // In a real implementation, you would integrate with Tesseract.js or similar
-        return new Promise((resolve) => {
-            // Simulate OCR processing time
-            setTimeout(() => {
-                resolve("OCR text extraction would be implemented here using libraries like Tesseract.js");
-            }, 1000);
-        });
-    }
-
-    // Method to detect and extract text from images on the page
-    async scanPageForImages() {
-        const images = document.querySelectorAll('img');
-        const results = [];
-        
-        for (const img of images) {
-            if (img.complete && img.naturalWidth > 100 && img.naturalHeight > 50) {
-                try {
-                    // Create canvas and draw image
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = img.naturalWidth;
-                    canvas.height = img.naturalHeight;
-                    ctx.drawImage(img, 0, 0);
-                    
-                    // Extract text (placeholder)
-                    const extractedText = await this.extractTextFromCanvas(canvas);
-                    
-                    if (extractedText.trim()) {
-                        results.push({
-                            src: img.src,
-                            alt: img.alt,
-                            text: extractedText
-                        });
-                    }
-                } catch (error) {
-                    console.warn('Failed to process image:', img.src, error);
-                }
-            }
-        }
-        
-        return results;
     }
 }
 
