@@ -1,4 +1,197 @@
-// Content script for Text Extractor Pro
+const config = {
+  termsKeywords: ['terms', 'privacy', 'policy', 'agreement', 'cookie', 'condition', 'notice', 'legal'],
+  acceptKeywords: ['accept', 'agree', 'continue', 'confirm', 'submit', 'acknowledge', 'consent']
+};
+
+class TermsDetector {
+  constructor() {
+    this.detectedData = {
+      termsLinks: [],
+      acceptanceElements: [],
+      termsContent: null,
+      timestamp: Date.now()
+    };
+    this.init();
+  }
+
+  init() {
+    this.detectElements();
+    this.setupMessageListener();
+    this.observeChanges();
+  }
+
+  detectTermsLinks() {
+    const links = document.querySelectorAll('a[href]');
+    const termsLinks = [];
+    
+    links.forEach(link => {
+      const text = (link.textContent + ' ' + link.href).toLowerCase();
+      const hasTermsKeyword = config.termsKeywords.some(keyword => text.includes(keyword));
+      
+      if (hasTermsKeyword) {
+        termsLinks.push({
+          text: link.textContent.trim(),
+          href: link.href,
+          element: link
+        });
+      }
+    });
+    
+    return termsLinks;
+  }
+
+  detectAcceptanceElements() {
+    const acceptanceElements = [];
+    
+    // Check buttons and inputs
+    const interactiveElements = document.querySelectorAll('button, input[type="submit"], input[type="button"], input[type="checkbox"]');
+    
+    interactiveElements.forEach(element => {
+      let textToCheck = element.textContent || element.value || '';
+      
+      // For checkboxes, also check associated label
+      if (element.type === 'checkbox') {
+        const label = document.querySelector(`label[for="${element.id}"]`) || 
+                     element.closest('label') || 
+                     element.parentElement;
+        if (label) textToCheck += ' ' + label.textContent;
+      }
+      
+      textToCheck = textToCheck.toLowerCase();
+      
+      const hasAcceptKeyword = config.acceptKeywords.some(keyword => textToCheck.includes(keyword));
+      const hasTermsReference = config.termsKeywords.some(keyword => textToCheck.includes(keyword));
+      
+      if (hasAcceptKeyword || hasTermsReference) {
+        acceptanceElements.push({
+          type: element.tagName.toLowerCase(),
+          inputType: element.type || null,
+          text: (element.textContent || element.value || '').trim(),
+          element: element
+        });
+      }
+    });
+    
+    return acceptanceElements;
+  }
+
+  async fetchTermsContent(url) {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'cors'
+      });
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Remove script and style elements
+      const scripts = doc.querySelectorAll('script, style, nav, header, footer');
+      scripts.forEach(el => el.remove());
+      
+      // Get main content areas
+      const contentSelectors = ['main', 'article', '.content', '#content', '.terms', '.policy'];
+      let content = '';
+      
+      for (const selector of contentSelectors) {
+        const element = doc.querySelector(selector);
+        if (element) {
+          content = element.textContent;
+          break;
+        }
+      }
+      
+      // Fallback to body if no main content found
+      if (!content) {
+        content = doc.body.textContent;
+      }
+      
+      // Clean up text
+      content = content
+        .replace(/\s+/g, ' ')
+        .replace(/\n\s*\n/g, '\n')
+        .trim();
+      
+      // Return first 2000 characters with summary
+      const summary = content.substring(0, 2000);
+      return {
+        summary: summary + (content.length > 2000 ? '...' : ''),
+        fullLength: content.length,
+        url: url
+      };
+      
+    } catch (error) {
+      console.warn('Could not fetch terms content:', error);
+      return {
+        summary: 'Could not fetch content from this URL.',
+        error: error.message,
+        url: url
+      };
+    }
+  }
+
+  async detectElements() {
+    const termsLinks = this.detectTermsLinks();
+    const acceptanceElements = this.detectAcceptanceElements();
+    
+    this.detectedData = {
+      termsLinks,
+      acceptanceElements,
+      termsContent: null,
+      timestamp: Date.now(),
+      hasTermsAndAcceptance: termsLinks.length > 0 && acceptanceElements.length > 0
+    };
+    
+    // If we found terms links, try to fetch content from the first one
+    if (termsLinks.length > 0) {
+      this.detectedData.termsContent = await this.fetchTermsContent(termsLinks[0].href);
+    }
+    
+    // Store data for popup access
+    chrome.runtime.sendMessage({
+      action: 'termsDetected',
+      data: this.detectedData
+    }).catch(() => {
+      // Extension might not be ready, store in sessionStorage as backup
+      try {
+        sessionStorage.setItem('termsDetectorData', JSON.stringify(this.detectedData));
+      } catch (e) {
+        console.warn('Could not store detection data:', e);
+      }
+    });
+  }
+
+  setupMessageListener() {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === 'getDetectionData') {
+        sendResponse(this.detectedData);
+      } else if (request.action === 'redetect') {
+        this.detectElements().then(() => {
+          sendResponse(this.detectedData);
+        });
+        return true; // Will respond asynchronously
+      }
+    });
+  }
+
+  observeChanges() {
+    const observer = new MutationObserver(() => {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = setTimeout(() => {
+        this.detectElements();
+      }, 1000);
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false
+    });
+  }
+}
 
 class ContentExtractor {
     constructor() {
@@ -254,6 +447,12 @@ class ContentExtractor {
             }
         });
     }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => new TermsDetector());
+} else {
+  new TermsDetector();
 }
 
 // Initialize content script

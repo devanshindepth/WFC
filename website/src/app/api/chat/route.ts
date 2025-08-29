@@ -5,6 +5,17 @@ export async function POST(request: NextRequest) {
   try {
     const { messages } = await request.json();
 
+    const systemPrompt = {
+      role: "system",
+      content: `You are an AI that analyzes Terms and Conditions text for potential risks. Your only job is to classify each detected risk into severity levels: Low, Medium, or High.
+
+                Output must only contain the severity levels in a comma-separated list.
+                Do not explain, justify, or provide text excerpts.
+                Do not include anything except the severity levels.
+                Example:
+                Input: Terms and Conditions text
+                Output: High, Medium`
+    }
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
         { error: "Invalid messages format" },
@@ -20,7 +31,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         "model": "google/gemini-2.5-flash-image-preview:free",
-        "messages": messages
+        "messages": [systemPrompt, ...messages]
       })
     });
 

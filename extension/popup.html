@@ -20,6 +20,199 @@
             color: #ffffff;
             letter-spacing: -0.02em;
         }
+
+        .content {
+            padding: 20px;
+            background: black;
+            min-height: 250px;
+        }
+
+        .status-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .status-card.detected {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .status-card.none {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .terms-links {
+            background: #e3f2fd;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .link-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .link-item:last-child {
+            border-bottom: none;
+        }
+
+        .link-text {
+            flex: 1;
+            font-size: 13px;
+            color: #1976d2;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .link-text:hover {
+            text-decoration: underline;
+        }
+
+        .acceptance-elements {
+            background: #fff3e0;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .element-item {
+            padding: 4px 0;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .element-type {
+            display: inline-block;
+            background: #ff9800;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-right: 8px;
+        }
+
+        .terms-content {
+            background: #f1f8e9;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .terms-text {
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            white-space: pre-wrap;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+        }
+
+        .empty-state svg {
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .info-text {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+
+        .url-info {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+            word-break: break-all;
+        }
         
         .btn {
             display: block;
@@ -103,6 +296,66 @@
     
     <div id="status" class="status"></div>
     
+    <div class="content">
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <div>Scanning page...</div>
+        </div>
+        
+        <div id="results" style="display: none;">
+            <div id="statusCard" class="status-card">
+                <strong id="statusText">No terms detected</strong>
+                <div class="info-text" id="statusInfo"></div>
+            </div>
+            
+            <div id="termsSection" class="section" style="display: none;">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"/>
+                    </svg>
+                    Terms & Policy Links (<span id="termsCount">0</span>)
+                </h3>
+                <div id="termsLinks" class="terms-links"></div>
+            </div>
+            
+            <div id="acceptanceSection" class="section" style="display: none;">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/>
+                    </svg>
+                    Acceptance Elements (<span id="acceptanceCount">0</span>)
+                </h3>
+                <div id="acceptanceElements" class="acceptance-elements"></div>
+            </div>
+            
+            <div id="contentSection" class="section" style="display: none;">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M13,9H18.5L13,3.5V9M6,2H14L20,8V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V4C4,2.89 4.89,2 6,2M15,18V16H6V18H15M18,14V12H6V14H18Z"/>
+                    </svg>
+                    Terms Content Preview
+                </h3>
+                <div id="termsContent" class="terms-content">
+                    <div id="termsText" class="terms-text"></div>
+                    <div id="contentUrl" class="url-info"></div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
+                <button id="openTermsBtn" class="btn btn-primary" style="display: none;">Open Terms</button>
+            </div>
+        </div>
+        
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13,9H18.5L13,3.5V9M6,2H14L20,8V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V4C4,2.89 4.89,2 6,2M15,18V16H6V18H15M18,14V12H6V14H18Z"/>
+            </svg>
+            <h3>No Terms Detected</h3>
+            <p>This page doesn't appear to contain terms of service or privacy policies.</p>
+        </div>
+    </div>
+
     <script src="popup.js"></script>
 </body>
 </html>
