@@ -7,15 +7,19 @@
     "activeTab",
     "storage",
     "scripting",
+    "identity",
+    "cookies",
     "contextMenus"
   ],
+  "oauth2": {
+    "client_id": "410225774953-pu75lt7cf5eg2hm4j3i6n0n2a5jjfe3n.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  },
   "host_permissions": [
+    "http://localhost:3000/*",
     "<all_urls>",
     "file://*/*"
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Extract Text"

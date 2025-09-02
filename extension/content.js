@@ -1,3 +1,4 @@
+
 const config = {
   termsKeywords: ['terms', 'privacy', 'policy', 'agreement', 'cookie', 'condition', 'notice', 'legal'],
   acceptKeywords: ['accept', 'agree', 'continue', 'confirm', 'submit', 'acknowledge', 'consent']

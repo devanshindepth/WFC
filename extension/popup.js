@@ -1,3 +1,33 @@
+const manifest = chrome.runtime.getManifest()
+
+const url = new URL('https://accounts.google.com/o/oauth2/auth')
+
+url.searchParams.set('client_id', manifest.oauth2.client_id)
+url.searchParams.set('response_type', 'id_token')
+url.searchParams.set('access_type', 'offline')
+url.searchParams.set('redirect_uri', `https://${chrome.runtime.id}.chromiumapp.org`)
+url.searchParams.set('scope', manifest.oauth2.scopes.join(' '))
+
+chrome.identity.launchWebAuthFlow(
+  {
+    url: url.href,
+    interactive: true,
+  },
+  async (redirectedTo) => {
+    if (chrome.runtime.lastError) {
+      // auth was not successful
+    } else {
+      // auth was successful, extract the ID token from the redirectedTo URL
+      const url = new URL(redirectedTo)
+      const params = new URLSearchParams(url.hash)
+
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: params.get('id_token'),
+      })
+    }
+  }
+)
 
 class TermsPopup {
   constructor() {
@@ -26,45 +56,213 @@ class TermsPopup {
   }
 
   async loadDetectionData() {
+  try {
+    const tab = await this.getCurrentTab();
+    
+    // Check if tab URL is supported
+    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+      this.showEmptyState();
+      return;
+    }
+    
+    // First try to inject the content script if it's not already there
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      });
+    } catch (injectionError) {
+      // Content script might already be injected, continue
+      console.log('Content script injection skipped:', injectionError.message);
+    }
+    
+    // Wait a moment for content script to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Try to get data from content script with timeout
+    const response = await Promise.race([
+      chrome.tabs.sendMessage(tab.id, { action: 'getDetectionData' }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      )
+    ]);
+    
+    if (response && response.timestamp) {
+      this.currentData = response;
+      this.displayResults();
+    } else {
+      // Trigger new detection
+      this.refreshDetection();
+    }
+  } catch (error) {
+    console.warn('Could not load detection data:', error.message);
+    
+    // Try fallback: check sessionStorage
     try {
       const tab = await this.getCurrentTab();
+      const fallbackData = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        function: () => {
+          try {
+            const stored = sessionStorage.getItem('termsDetectorData');
+            return stored ? JSON.parse(stored) : null;
+          } catch (e) {
+            return null;
+          }
+        }
+      });
       
-      // Try to get data from content script
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'getDetectionData' });
-      
-      if (response && response.timestamp) {
-        this.currentData = response;
+      if (fallbackData[0]?.result) {
+        this.currentData = fallbackData[0].result;
         this.displayResults();
-      } else {
-        // Fallback: trigger new detection
-        this.refreshDetection();
+        return;
       }
-    } catch (error) {
-      console.warn('Could not load detection data:', error);
-      this.showEmptyState();
+    } catch (fallbackError) {
+      console.warn('Fallback also failed:', fallbackError.message);
     }
+    
+    this.showEmptyState();
   }
+}
 
   async refreshDetection() {
-    this.showLoading();
+  this.showLoading();
+  
+  try {
+    const tab = await this.getCurrentTab();
     
+    // Check if tab URL is supported
+    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+      this.showEmptyState();
+      return;
+    }
+    
+    // Ensure content script is injected
     try {
-      const tab = await this.getCurrentTab();
-      
-      // Trigger re-detection in content script
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'redetect' });
-      
-      if (response) {
-        this.currentData = response;
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      });
+    } catch (injectionError) {
+      console.log('Content script injection skipped:', injectionError.message);
+    }
+    
+    // Wait for initialization
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Trigger re-detection with timeout
+    const response = await Promise.race([
+      chrome.tabs.sendMessage(tab.id, { action: 'redetect' }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Detection timeout')), 5000)
+      )
+    ]);
+    
+    if (response) {
+      this.currentData = response;
+      this.displayResults();
+    } else {
+      // Manual detection fallback
+      const detectionResult = await this.manualDetection(tab.id);
+      if (detectionResult) {
+        this.currentData = detectionResult;
         this.displayResults();
       } else {
         this.showEmptyState();
       }
-    } catch (error) {
-      console.error('Refresh failed:', error);
+    }
+  } catch (error) {
+    console.error('Refresh failed:', error.message);
+    
+    // Try manual detection as last resort
+    try {
+      const tab = await this.getCurrentTab();
+      const detectionResult = await this.manualDetection(tab.id);
+      if (detectionResult) {
+        this.currentData = detectionResult;
+        this.displayResults();
+      } else {
+        this.showEmptyState();
+      }
+    } catch (manualError) {
+      console.error('Manual detection also failed:', manualError.message);
       this.showEmptyState();
     }
   }
+}
+
+// Add this helper method to the TermsPopup class
+async manualDetection(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      function: () => {
+        // Inline detection logic as fallback
+        const config = {
+          termsKeywords: ['terms', 'privacy', 'policy', 'agreement', 'cookie', 'condition', 'notice', 'legal'],
+          acceptKeywords: ['accept', 'agree', 'continue', 'confirm', 'submit', 'acknowledge', 'consent']
+        };
+        
+        // Detect terms links
+        const links = document.querySelectorAll('a[href]');
+        const termsLinks = [];
+        
+        links.forEach(link => {
+          const text = (link.textContent + ' ' + link.href).toLowerCase();
+          const hasTermsKeyword = config.termsKeywords.some(keyword => text.includes(keyword));
+          
+          if (hasTermsKeyword) {
+            termsLinks.push({
+              text: link.textContent.trim(),
+              href: link.href
+            });
+          }
+        });
+        
+        // Detect acceptance elements
+        const acceptanceElements = [];
+        const interactiveElements = document.querySelectorAll('button, input[type="submit"], input[type="button"], input[type="checkbox"]');
+        
+        interactiveElements.forEach(element => {
+          let textToCheck = element.textContent || element.value || '';
+          
+          if (element.type === 'checkbox') {
+            const label = document.querySelector(`label[for="${element.id}"]`) || 
+                         element.closest('label') || 
+                         element.parentElement;
+            if (label) textToCheck += ' ' + label.textContent;
+          }
+          
+          textToCheck = textToCheck.toLowerCase();
+          
+          const hasAcceptKeyword = config.acceptKeywords.some(keyword => textToCheck.includes(keyword));
+          const hasTermsReference = config.termsKeywords.some(keyword => textToCheck.includes(keyword));
+          
+          if (hasAcceptKeyword || hasTermsReference) {
+            acceptanceElements.push({
+              type: element.tagName.toLowerCase(),
+              inputType: element.type || null,
+              text: (element.textContent || element.value || '').trim()
+            });
+          }
+        });
+        
+        return {
+          termsLinks,
+          acceptanceElements,
+          termsContent: null,
+          timestamp: Date.now(),
+          hasTermsAndAcceptance: termsLinks.length > 0 && acceptanceElements.length > 0
+        };
+      }
+    });
+    
+    return results[0]?.result || null;
+  } catch (error) {
+    console.error('Manual detection failed:', error);
+    return null;
+  }
+}
 
   showLoading() {
     document.getElementById('loading').style.display = 'block';
