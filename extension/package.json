@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "webpack",
+    "build": "rollup -c",
+    "release": "cross-env NODE_ENV=production rollup -c",
+    "start": "rollup -c -w",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -28,7 +30,18 @@
   },
   "dependencies": {
     "@haverstack/axios-fetch-adapter": "^0.12.0",
+    "@rollup/plugin-alias": "^5.1.1",
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-replace": "^6.0.2",
+    "@supabase/supabase-js": "^2.57.0",
     "@vespaiach/axios-fetch-adapter": "^0.3.1",
-    "axios": "^1.6.7"
+    "axios": "^1.6.7",
+    "localforage": "^1.10.0",
+    "rollup": "^4.50.0",
+    "rollup-plugin-chrome-extension": "^3.6.15",
+    "rollup-plugin-empty-dir": "^1.0.5",
+    "rollup-plugin-zip": "^1.0.3"
   }
 }

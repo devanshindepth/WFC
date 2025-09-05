@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
                 Do not include anything except the severity levels.
                 Example:
                 Input: Terms and Conditions text
-                Output: High, Medium`
+                Output: Low, High, Medium`
     }
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "google/gemini-2.5-flash-image-preview:free",
+        "model": "google/gemini-2.0-flash-exp:free",
         "messages": [systemPrompt, ...messages]
       })
     });
