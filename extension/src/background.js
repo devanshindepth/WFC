@@ -171,3 +171,66 @@ try {
 } catch (e) {
   console.log("error", e);
 }
+
+// Create context menu for Read Mode
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "readMode",
+    title: "Read Mode - Extract Legal Text",
+    contexts: ["page", "selection"]
+  });
+});
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "readMode") {
+    // Inject content script if needed
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content.js"]
+    }).then(() => {
+      // Send message to extract legal text
+      chrome.tabs.sendMessage(tab.id, {
+        action: "extractLegalText",
+        selectedText: info.selectionText || null
+      }, (response) => {
+        if (response && response.success) {
+          // Store the extracted data using keys that viewer.js expects
+          chrome.storage.local.set({
+            // CHANGE: 'legalText' is now 'extractedText'
+            extractedText: response.text,
+            // CHANGE: 'sourceTitle' is now 'extractedTitle'
+            extractedTitle: tab.title, 
+            timestamp: Date.now(),
+            // You can also store the URL if needed later
+            sourceUrl: tab.url 
+          }, () => {
+            // Open the main viewer instead of the old readmode page
+            chrome.tabs.create({
+              // CHANGE: The URL now points to viewer.html
+              url: chrome.runtime.getURL("viewer.html") 
+            });
+          });
+        }
+      });
+    }).catch(error => {
+      console.error("Failed to inject content script:", error);
+    });
+  }
+});
+
+// Handle messages from content script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "openReadMode") {
+    chrome.storage.local.set({
+      legalText: request.text,
+      sourceUrl: request.url,
+      sourceTitle: request.title,
+      timestamp: Date.now()
+    }, () => {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL("readmode.html")
+      });
+    });
+  }
+});

@@ -1,4 +1,3 @@
-//AUTH.js
 //Check user logged in
 chrome.runtime.sendMessage({ command: "checkAuth" }, (response) => {
   document.querySelector(".loading").style.display = "none";

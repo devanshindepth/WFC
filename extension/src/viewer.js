@@ -1,7 +1,138 @@
 class LegalChatApp {
+    constructor() {
+        this.messages = [];
+        this.document = [];
+        this.documentTitle = '';
+        this.isLoading = false;
+        this.isLoadingDocument = false;
+        this.viewMode = 'chat'; // 'chat' or 'read'
+        this.readMode = 'normal'; // 'normal' or 'focus'
+        this.currentClauseIndex = 0;
+        this.selectedText = '';
+        this.extractedData = null;
+        
+        this.API_BASE_URL = 'http://localhost:3000';
+        this.AI_ENDPOINT = '/api/ai/chat';
+        this.DOCUMENT_ENDPOINT = '/api/ai/document';
+        
+        this.initializeElements();
+        this.attachEventListeners();
+        this.init();
+    }
 
-            scrollToBottom() {
-        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    initializeElements() {
+        // Main containers
+        this.chatModeContainer = document.getElementById('chatModeContainer');
+        this.readModeContainer = document.getElementById('readModeContainer');
+        this.normalReadContent = document.getElementById('normalReadContent');
+        this.focusReadContent = document.getElementById('focusReadContent');
+        
+        // Navigation elements
+        this.chatModeBtn = document.getElementById('chatModeBtn');
+        this.readModeBtn = document.getElementById('readModeBtn');
+        this.normalReadBtn = document.getElementById('normalReadBtn');
+        this.focusReadBtn = document.getElementById('focusReadBtn');
+        this.readModeToggle = document.getElementById('readModeToggle');
+        
+        // Chat elements
+        this.messagesContainer = document.getElementById('messagesContainer');
+        this.messageInput = document.getElementById('messageInput');
+        this.sendButton = document.getElementById('sendButton');
+        this.welcomeMessage = document.getElementById('welcomeMessage');
+        
+        // Document elements
+        this.documentContentElement = document.getElementById('documentContent');
+        this.documentTitleElement = document.getElementById('documentTitle');
+        this.refreshButton = document.getElementById('refreshButton');
+        
+        // Read mode elements
+        this.readDocumentTitleElement = document.getElementById('readDocumentTitle');
+        this.readRefreshButton = document.getElementById('readRefreshButton');
+        this.readDocumentContent = document.getElementById('readDocumentContent');
+        
+        // Focus mode elements
+        this.focusDocumentTitleElement = document.getElementById('focusDocumentTitle');
+        this.focusClauseCounter = document.getElementById('focusClauseCounter');
+        this.focusClauseContent = document.getElementById('focusClauseContent');
+        this.prevClauseBtn = document.getElementById('prevClauseBtn');
+        this.nextClauseBtn = document.getElementById('nextClauseBtn');
+        this.focusRefreshButton = document.getElementById('focusRefreshButton');
+    }
+
+    attachEventListeners() {
+        // Navigation
+        this.chatModeBtn.addEventListener('click', () => this.switchToMode('chat'));
+        this.readModeBtn.addEventListener('click', () => this.switchToMode('read'));
+        this.normalReadBtn.addEventListener('click', () => this.switchReadMode('normal'));
+        this.focusReadBtn.addEventListener('click', () => this.switchReadMode('focus'));
+        
+        // Chat functionality
+        this.sendButton.addEventListener('click', () => this.handleSendMessage());
+        this.messageInput.addEventListener('keypress', (e) => this.handleKeyPress(e));
+        
+        // Document refresh
+        this.refreshButton.addEventListener('click', () => this.init());
+        this.readRefreshButton.addEventListener('click', () => this.init());
+        this.focusRefreshButton.addEventListener('click', () => this.init());
+        
+        // Focus mode navigation
+        this.prevClauseBtn.addEventListener('click', () => this.handlePrevClause());
+        this.nextClauseBtn.addEventListener('click', () => this.handleNextClause());
+        
+        // Document selection handling
+        document.addEventListener('mouseup', () => this.handleTextSelection());
+        
+        // Keyboard shortcuts for focus mode
+        document.addEventListener('keydown', (e) => {
+            if (this.viewMode === 'read' && this.readMode === 'focus') {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    this.handlePrevClause();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    this.handleNextClause();
+                }
+            }
+        });
+    }
+
+    async init() {
+        // Try to load from extension storage first
+        const loadedFromStorage = await this.loadExtractedData();
+        
+        // If nothing was loaded, load the default mock document
+        if (!loadedFromStorage) {
+            this.loadDocument();
+        }
+    }
+
+    _formatTextToHtml(text) {
+        // Sanitize text to prevent rendering unintended HTML
+        let safeText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        // Split the entire text into blocks based on double newlines (paragraphs)
+        const blocks = safeText.split(/\n\n+/);
+        
+        let html = '';
+        
+        blocks.forEach(block => {
+            const trimmedBlock = block.trim();
+            if (trimmedBlock) {
+                if (trimmedBlock.startsWith('## ')) {
+                    // It's a main heading (H2)
+                    html += `<h2>${trimmedBlock.substring(3)}</h2>`;
+                } else if (trimmedBlock.startsWith('### ')) {
+                    // It's a sub-heading (H3)
+                    html += `<h3>${trimmedBlock.substring(4)}</h3>`;
+                } else {
+                    // It's a paragraph. Replace single newlines within the paragraph with <br>.
+                    const paragraphHtml = trimmedBlock.replace(/\n/g, '<br>');
+                    html += `<p>${paragraphHtml}</p>`;
+                }
+            }
+        });
+        
+        return html || '<p>No legal text found or content is empty.</p>';
     }
 
     async loadExtractedData() {
@@ -19,12 +150,15 @@ class LegalChatApp {
                         fileType: data.fileType
                     };
                     
-                    // Update document title to show extracted content
-                    this.documentTitle.textContent = this.extractedData.title;
+                    // Send extracted text to backend API
+                    const processedDocument = await this.sendDocumentToBackend(this.extractedData.text);
                     
-                    // Display the extracted content in the document panel
-                    this.displayExtractedContent();
-                    return true; // MODIFICATION: Indicate success
+                    // Update document title to show extracted content
+                    this.setDocumentTitle(this.extractedData.title);
+                    
+                    // Display the processed content from the backend
+                    this.displayProcessedContent(processedDocument);
+                    return true;
                 }
             } else {
                 console.log('Chrome storage not available - running outside extension');
@@ -32,91 +166,60 @@ class LegalChatApp {
         } catch (error) {
             console.error('Error loading extracted content:', error);
         }
-        return false; // MODIFICATION: Indicate failure
+        return false;
     }
 
-    displayExtractedContent() {
-        if (!this.extractedData) return;
+    async sendDocumentToBackend(text) {
+        try {
+            const response = await fetch(`${this.API_BASE_URL}${this.DOCUMENT_ENDPOINT}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: text }),
+            });
 
-        const { text, title, timestamp, fileData, fileType } = this.extractedData;
-        
-        let contentHtml = '';
-        
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error sending document to backend:', error);
+            // Return the original text if API call fails
+            return { content: text, title: 'Processed Document' };
+        }
+    }
+
+    displayProcessedContent(processedDocument) {
+        if (!processedDocument) return;
+
         // Add timestamp info if available
-        if (timestamp) {
-            const date = new Date(timestamp);
+        let contentHtml = '';
+        if (this.extractedData.timestamp) {
+            const date = new Date(this.extractedData.timestamp);
             contentHtml += `
                 <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: #6b7280;">
-                    <strong>${title}</strong><br>
+                    <strong>${this.extractedData.title}</strong><br>
                     Extracted on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}
                 </div>
             `;
         }
-        
-        // Display content based on type
-        if (fileData && (fileType === 'pdf' || fileType === 'image')) {
-            if (fileType === 'image') {
-                contentHtml += `
-                    <div class="clause">
-                        <div class="clause-content">
-                            <div class="clause-number">🖼️</div>
-                            <div class="clause-text">
-                                <strong>Uploaded Image</strong><br>
-                                <img src="${fileData}" style="max-width: 100%; height: auto; margin-top: 0.5rem; border-radius: 0.5rem;" />
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else if (fileType === 'pdf') {
-                contentHtml += `
-                    <div class="clause">
-                        <div class="clause-content">
-                            <div class="clause-number">📄</div>
-                            <div class="clause-text">
-                                <strong>Uploaded PDF Document</strong><br>
-                                <iframe src="${fileData}" style="width: 100%; height: 400px; margin-top: 0.5rem; border: 1px solid #e5e7eb; border-radius: 0.5rem;"></iframe>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-        } else if (text) {
-            // Split text into paragraphs and display as clauses
-            const paragraphs = text.split('\n\n').filter(p => p.trim());
+
+        // Parse the processed content into clauses for document structure
+        if (processedDocument.content) {
+            const paragraphs = processedDocument.content.split('\n\n').filter(p => p.trim());
             
-            paragraphs.forEach((paragraph, index) => {
-                if (paragraph.trim()) {
-                    contentHtml += `
-                        <div class="clause" data-paragraph-index="${index}">
-                            <div class="clause-tooltip">Click to discuss</div>
-                            <div class="clause-content">
-                                <div class="clause-number">${index + 1}</div>
-                                <div class="clause-text">${this.escapeHtml(paragraph.trim())}</div>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
+            // Update document array for consistency
+            this.document = paragraphs.map((paragraph, index) => ({
+                id: `clause-${index}`,
+                text: paragraph.trim(),
+                index: index + 1
+            }));
+            
+            this.renderAllDocumentViews();
         }
-        
-        contentHtml += `
-            <div class="tip-box">
-                <p><strong>💡 Tip:</strong> Click on any section to discuss it with the AI, or ask questions directly in the chat.</p>
-            </div>
-        `;
-        
-        this.documentContent.innerHTML = contentHtml;
-        
-        // Add click listeners to paragraphs
-        this.documentContent.querySelectorAll('.clause[data-paragraph-index]').forEach(clauseElement => {
-            clauseElement.addEventListener('click', (e) => {
-                const paragraphIndex = parseInt(e.currentTarget.dataset.paragraphIndex);
-                const paragraphs = text.split('\n\n').filter(p => p.trim());
-                if (paragraphs[paragraphIndex]) {
-                    this.handleExtractedContentClick(paragraphs[paragraphIndex].trim());
-                }
-            });
-        });
     }
 
     handleExtractedContentClick(content) {
@@ -124,52 +227,109 @@ class LegalChatApp {
         this.messageInput.value = question;
         this.handleSendMessage();
     }
-    
-    constructor() {
-        this.messages = [];
-        this.document = [];
-        this.documentTitle = '';
-        this.isLoading = false;
-        this.isLoadingDocument = false;
-        
-        this.API_BASE_URL = 'http://localhost:3000';
-        this.AI_ENDPOINT = '/api/chat';
-        this.DOCUMENT_ENDPOINT = '/api/document';
-        
-        this.initializeElements();
-        this.attachEventListeners();
-        this.init(); // MODIFICATION: Call the new init method
+
+    switchToMode(mode) {
+        this.viewMode = mode;
+        this.updateModeDisplay();
     }
 
-    // NEW METHOD: Handles initial data loading logic
-    async init() {
-        // Try to load from extension storage first
-        const loadedFromStorage = await this.loadExtractedData();
+    switchReadMode(mode) {
+        this.readMode = mode;
+        this.updateReadModeDisplay();
+    }
+
+    updateModeDisplay() {
+        // Update button states
+        this.chatModeBtn.className = this.viewMode === 'chat' 
+            ? 'mode-btn mode-btn-active' 
+            : 'mode-btn';
+        this.readModeBtn.className = this.viewMode === 'read' 
+            ? 'mode-btn mode-btn-active' 
+            : 'mode-btn';
         
-        // If nothing was loaded, load the default mock document
-        if (!loadedFromStorage) {
-            this.loadDocument();
+        // Show/hide containers
+        this.chatModeContainer.style.display = this.viewMode === 'chat' ? 'flex' : 'none';
+        this.readModeContainer.style.display = this.viewMode === 'read' ? 'flex' : 'none';
+        
+        // Show/hide read mode toggle
+        this.readModeToggle.style.display = this.viewMode === 'read' ? 'flex' : 'none';
+        
+        if (this.viewMode === 'read') {
+            this.updateReadModeDisplay();
         }
     }
 
-    initializeElements() {
-        this.messagesContainer = document.getElementById('messagesContainer');
-        this.messageInput = document.getElementById('messageInput');
-        this.sendButton = document.getElementById('sendButton');
-        this.documentContent = document.getElementById('documentContent');
-        this.documentTitle = document.getElementById('documentTitle');
-        this.refreshButton = document.getElementById('refreshButton');
-        this.welcomeMessage = document.getElementById('welcomeMessage');
+    updateReadModeDisplay() {
+        // Update read mode button states
+        this.normalReadBtn.className = this.readMode === 'normal' 
+            ? 'read-mode-btn read-mode-btn-active' 
+            : 'read-mode-btn';
+        this.focusReadBtn.className = this.readMode === 'focus' 
+            ? 'read-mode-btn read-mode-btn-active' 
+            : 'read-mode-btn';
+        
+        // Show/hide read mode content
+        this.normalReadContent.style.display = this.readMode === 'normal' ? 'flex' : 'none';
+        this.focusReadContent.style.display = this.readMode === 'focus' ? 'flex' : 'none';
+        
+        if (this.readMode === 'focus') {
+            this.updateFocusMode();
+        }
     }
 
-    attachEventListeners() {
-        this.sendButton.addEventListener('click', () => this.handleSendMessage());
-        this.messageInput.addEventListener('keypress', (e) => this.handleKeyPress(e));
-        // MODIFICATION: Refresh button should also try to load extracted data first
-        this.refreshButton.addEventListener('click', () => this.init());
+    updateFocusMode() {
+        if (this.document.length > 0 && this.currentClauseIndex < this.document.length) {
+            const clause = this.document[this.currentClauseIndex];
+            this.focusClauseCounter.textContent = `Clause ${this.currentClauseIndex + 1} of ${this.document.length}`;
+            
+            this.focusClauseContent.innerHTML = `
+                <div class="focus-clause" data-clause-id="${clause.id}">
+                    <div class="focus-clause-content">
+                        <span class="focus-clause-number">${clause.index}</span>
+                        <div class="focus-clause-text">${this.escapeHtml(clause.text)}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Update navigation button states
+            this.prevClauseBtn.disabled = this.currentClauseIndex === 0;
+            this.nextClauseBtn.disabled = this.currentClauseIndex === this.document.length - 1;
+        }
     }
 
-    // ... (The rest of your file remains the same from here)
+    handlePrevClause() {
+        if (this.currentClauseIndex > 0) {
+            this.currentClauseIndex--;
+            this.updateFocusMode();
+        }
+    }
+
+    handleNextClause() {
+        if (this.currentClauseIndex < this.document.length - 1) {
+            this.currentClauseIndex++;
+            this.updateFocusMode();
+        }
+    }
+
+    handleTextSelection() {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim().length > 0) {
+            const text = selection.toString().trim();
+            this.selectedText = text;
+            
+            // Auto-explain selected text
+            const question = `Explain this selected text in simple terms: "${text}"`;
+            if (this.viewMode === 'chat') {
+                this.addMessage(question, 'user');
+            } else {
+                // Switch to chat mode and add the question
+                this.switchToMode('chat');
+                setTimeout(() => {
+                    this.addMessage(question, 'user');
+                }, 100);
+            }
+        }
+    }
 
     handleKeyPress(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -184,20 +344,9 @@ class LegalChatApp {
 
         this.addMessage(message, 'user');
         this.messageInput.value = '';
-        this.setLoading(true);
-
-        try {
-            const aiResponse = await this.sendToAI(message);
-            this.addMessage(aiResponse, 'ai');
-        } catch (error) {
-            console.error('Error getting AI response:', error);
-            this.addMessage('Sorry, I encountered an error processing your request. Please try again.', 'ai');
-        } finally {
-            this.setLoading(false);
-        }
     }
 
-    addMessage(text, sender) {
+    async addMessage(text, sender) {
         const message = {
             id: Date.now().toString(),
             text,
@@ -212,6 +361,37 @@ class LegalChatApp {
         if (this.messages.length === 1) {
             this.welcomeMessage.style.display = 'none';
         }
+
+        if (sender === 'user') {
+            this.setLoading(true);
+            try {
+                const aiResponse = await this.sendToAI(text);
+                const aiMessage = {
+                    id: (Date.now() + 1).toString(),
+                    text: aiResponse,
+                    sender: 'ai',
+                    timestamp: new Date()
+                };
+                
+                this.messages.push(aiMessage);
+                this.renderMessage(aiMessage);
+                this.scrollToBottom();
+            } catch (error) {
+                console.error('Error getting AI response:', error);
+                const errorMessage = {
+                    id: (Date.now() + 1).toString(),
+                    text: 'Sorry, I encountered an error processing your request. Please try again.',
+                    sender: 'ai',
+                    timestamp: new Date()
+                };
+                
+                this.messages.push(errorMessage);
+                this.renderMessage(errorMessage);
+                this.scrollToBottom();
+            } finally {
+                this.setLoading(false);
+            }
+        }
     }
 
     renderMessage(message) {
@@ -224,6 +404,10 @@ class LegalChatApp {
             </div>
         `;
         this.messagesContainer.appendChild(messageDiv);
+    }
+
+    scrollToBottom() {
+        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
 
     setLoading(isLoading) {
@@ -262,91 +446,90 @@ class LegalChatApp {
     }
 
     async sendToAI(message) {
-        const response = await fetch(`${this.API_BASE_URL}${this.AI_ENDPOINT}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                messages: [
-                    {
-                        role: 'user',
-                        content: message
-                    }
-                ]
-            }),
-        });
+        try {
+            const response = await fetch(`${this.API_BASE_URL}${this.AI_ENDPOINT}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    messages: [
+                        {
+                            role: 'user',
+                            content: message
+                        }
+                    ]
+                }),
+            });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || data.message || 'Sorry, I could not process your request.';
+        } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
         }
-
-        const data = await response.json();
-        
-        return data.choices?.[0]?.message?.content || data.message || 'Sorry, I could not process your request.';
     }
 
     async loadDocument() {
         this.isLoadingDocument = true;
-        this.refreshButton.disabled = true;
-        this.showDocumentLoading();
+        this.setDocumentLoading(true);
 
         try {
             const documentData = await this.fetchLegalDocument();
-            this.documentTitle.textContent = documentData.title;
-            this.document = documentData.clauses;
-            this.renderDocument();
+            this.setDocumentTitle(documentData.title);
+            
+            // Parse content into clauses
+            const clauses = documentData.content
+                .split('\n\n')
+                .filter(clause => clause.trim().length > 0)
+                .map((clause, index) => ({
+                    id: `clause-${index}`,
+                    text: clause.trim(),
+                    index: index + 1
+                }));
+            
+            this.document = clauses;
+            this.renderAllDocumentViews();
         } catch (error) {
             console.error('Error loading document:', error);
-            this.documentTitle.textContent = 'Error Loading Document';
+            this.setDocumentTitle('Error Loading Document');
             this.showDocumentError();
         } finally {
             this.isLoadingDocument = false;
-            this.refreshButton.disabled = false;
+            this.setDocumentLoading(false);
         }
     }
 
-    async fetchLegalDocument() {
-        // Mock document - replace with actual API call
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    title: 'Terms and Conditions',
-                    clauses: [
-                        { id: 'clause-1', text: 'By using this service, you agree to be bound by these terms and conditions. These terms constitute a legal agreement between you and the company.', index: 1 },
-                        { id: 'clause-2', text: 'The company reserves the right to modify these terms at any time without prior notice. Continued use of the service constitutes acceptance of modified terms.', index: 2 },
-                        { id: 'clause-3', text: 'All intellectual property rights in the service and its content are owned by the company. Users may not reproduce, distribute, or create derivative works.', index: 3 },
-                        { id: 'clause-4', text: 'The service is provided "as is" without any warranties. The company disclaims all liability for damages arising from use of the service.', index: 4 },
-                        { id: 'clause-5', text: 'Users are responsible for maintaining the confidentiality of their account credentials and for all activities under their account.', index: 5 }
-                    ]
-                });
-            }, 1000);
-        });
+    setDocumentTitle(title) {
+        // Fixed: Set textContent on DOM elements, not on string properties
+        if (this.documentTitleElement) this.documentTitleElement.textContent = title;
+        if (this.readDocumentTitleElement) this.readDocumentTitleElement.textContent = title;
+        if (this.focusDocumentTitleElement) this.focusDocumentTitleElement.textContent = title;
     }
 
-    showDocumentLoading() {
-        this.documentContent.innerHTML = `
-            <div class="loading-document">
-                <div>
-                    <div class="spinner"></div>
-                    <p>Loading document from API...</p>
-                </div>
-            </div>
-        `;
+    setDocumentLoading(isLoading) {
+        if (this.refreshButton) this.refreshButton.disabled = isLoading;
+        if (this.readRefreshButton) this.readRefreshButton.disabled = isLoading;
+        if (this.focusRefreshButton) this.focusRefreshButton.disabled = isLoading;
+        
+        if (isLoading) {
+            this.showDocumentLoading();
+        }
     }
 
-    showDocumentError() {
-        this.documentContent.innerHTML = `
-            <div class="clause">
-                <div class="clause-content">
-                    <div class="clause-number">!</div>
-                    <div class="clause-text">Failed to load document from API. Please try refreshing.</div>
-                </div>
-            </div>
-        `;
+    renderAllDocumentViews() {
+        this.renderChatDocument();
+        this.renderReadDocument();
+        this.updateFocusMode();
     }
 
-    renderDocument() {
+    renderChatDocument() {
+        if (!this.documentContentElement) return;
+        
         const clausesHtml = this.document.map(clause => `
             <div class="clause" data-clause-id="${clause.id}">
                 <div class="clause-tooltip">Click to explain</div>
@@ -357,7 +540,7 @@ class LegalChatApp {
             </div>
         `).join('');
 
-        this.documentContent.innerHTML = `
+        this.documentContentElement.innerHTML = `
             <div>
                 ${clausesHtml}
                 <div class="tip-box">
@@ -366,7 +549,7 @@ class LegalChatApp {
             </div>
         `;
 
-        this.documentContent.querySelectorAll('.clause').forEach(clauseElement => {
+        this.documentContentElement.querySelectorAll('.clause').forEach(clauseElement => {
             clauseElement.addEventListener('click', (e) => {
                 const clauseId = e.currentTarget.dataset.clauseId;
                 const clause = this.document.find(c => c.id === clauseId);
@@ -377,10 +560,80 @@ class LegalChatApp {
         });
     }
 
+    renderReadDocument() {
+        if (!this.readDocumentContent || !this.extractedData?.text) {
+            this.readDocumentContent.innerHTML = '<p>No content available to display.</p>';
+            return;
+        }
+        
+        // Use the new formatting function to generate HTML from the raw text
+        const formattedHtml = this._formatTextToHtml(this.extractedData.text);
+
+        // Set the innerHTML of the read mode container
+        this.readDocumentContent.innerHTML = `
+            <div class="read-document-wrapper">
+                ${formattedHtml}
+                <div class="read-tip-box">
+                    <p><strong>💡 Reading Mode:</strong> Select any text in the document to get an AI explanation. Use Focus Mode for clause-by-clause reading.</p>
+                </div>
+            </div>
+        `;
+    }
+
     handleClauseClick(clause) {
         const question = `Explain this clause in simple terms: ${clause.text}`;
         this.messageInput.value = question;
         this.handleSendMessage();
+    }
+
+    async fetchLegalDocument() {
+        // Mock document - replace with actual API call
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve({
+                    title: 'Terms and Conditions',
+                    content: `By using this service, you agree to be bound by these terms and conditions. These terms constitute a legal agreement between you and the company.
+
+The company reserves the right to modify these terms at any time without prior notice. Continued use of the service constitutes acceptance of modified terms.
+
+All intellectual property rights in the service and its content are owned by the company. Users may not reproduce, distribute, or create derivative works.
+
+The service is provided "as is" without any warranties. The company disclaims all liability for damages arising from use of the service.
+
+Users are responsible for maintaining the confidentiality of their account credentials and for all activities under their account.`
+                });
+            }, 1000);
+        });
+    }
+
+    showDocumentLoading() {
+        const loadingHtml = `
+            <div class="loading-document">
+                <div>
+                    <div class="spinner"></div>
+                    <p>Loading document from API...</p>
+                </div>
+            </div>
+        `;
+        
+        if (this.documentContentElement) this.documentContentElement.innerHTML = loadingHtml;
+        if (this.readDocumentContent) this.readDocumentContent.innerHTML = loadingHtml;
+        if (this.focusClauseContent) this.focusClauseContent.innerHTML = loadingHtml;
+    }
+
+    showDocumentError() {
+        const errorHtml = `
+            <div class="clause">
+                <div class="clause-content">
+                    <div class="clause-number">!</div>
+                    <div class="clause-text">Failed to load document from API. Please try refreshing.</div>
+                </div>
+            </div>
+        `;
+        
+        if (this.documentContentElement) this.documentContentElement.innerHTML = errorHtml;
+        if (this.readDocumentContent) this.readDocumentContent.innerHTML = errorHtml;
+        if (this.focusClauseContent) this.focusClauseContent.innerHTML = errorHtml;
     }
 
     escapeHtml(text) {

@@ -450,6 +450,406 @@ class ContentExtractor {
     }
 }
 
+class LegalTextExtractor {
+  constructor() {
+    this.legalKeywords = [
+      // Legal terms
+      'terms', 'conditions', 'privacy', 'policy', 'agreement', 'license',
+      'disclaimer', 'liability', 'warranty', 'indemnification', 'arbitration',
+      'jurisdiction', 'governing law', 'dispute', 'resolution', 'legal',
+      'copyright', 'trademark', 'intellectual property', 'rights reserved',
+      'confidentiality', 'non-disclosure', 'data protection', 'gdpr', 'ccpa',
+      'cookies', 'consent', 'opt-out', 'compliance', 'regulation',
+      
+      // Legal phrases
+      'terms of service', 'terms of use', 'privacy policy', 'cookie policy',
+      'acceptable use', 'user agreement', 'end user', 'eula', 'service agreement',
+      'binding agreement', 'legal notice', 'fair use', 'limitation of liability',
+      'force majeure', 'severability', 'entire agreement', 'modification',
+      'termination', 'suspension', 'prohibited', 'restrictions', 'obligations',
+      'representations', 'warranties', 'covenants', 'shall', 'hereby',
+      'whereas', 'herein', 'thereof', 'notwithstanding'
+    ];
+
+    this.setupMessageListener();
+  }
+
+  setupMessageListener() {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === 'extractLegalText') {
+        const result = request.selectedText 
+          ? this.extractFromSelection(request.selectedText)
+          : this.extractLegalTextFromPage();
+        sendResponse(result);
+      }
+      return true;
+    });
+  }
+
+  extractFromSelection(selectedText) {
+    // Process selected text to find legal content
+    const processedText = this.processLegalText(selectedText);
+    
+    return {
+      success: true,
+      text: processedText.text,
+      sections: processedText.sections,
+      metadata: {
+        source: 'selection',
+        url: window.location.href,
+        title: document.title,
+        extractedAt: new Date().toISOString()
+      }
+    };
+  }
+
+  extractLegalTextFromPage() {
+    const legalSections = [];
+    const processedElements = new Set();
+    
+    // Find all potential legal text containers
+    const elements = this.findLegalElements();
+    
+    elements.forEach(element => {
+      if (processedElements.has(element)) return;
+      
+      const section = this.extractSectionContent(element);
+      if (section && section.content.length > 100) { // Min length for valid section
+        legalSections.push(section);
+        processedElements.add(element);
+      }
+    });
+
+    // Sort sections by relevance score
+    legalSections.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+    // Format the extracted text
+    const formattedText = this.formatLegalSections(legalSections);
+
+    return {
+      success: true,
+      text: formattedText.text,
+      sections: formattedText.sections,
+      metadata: {
+        source: 'page',
+        url: window.location.href,
+        title: document.title,
+        extractedAt: new Date().toISOString(),
+        sectionsFound: legalSections.length
+      }
+    };
+  }
+
+  findLegalElements() {
+    const elements = [];
+    const selectors = [
+      // Direct content selectors
+      'main', 'article', '.content', '#content', '.legal', '.terms',
+      '.privacy', '.policy', '.agreement', '.disclaimer', '.container',
+      '[class*="terms"]', '[class*="privacy"]', '[class*="policy"]',
+      '[class*="legal"]', '[id*="terms"]', '[id*="privacy"]', 
+      '[id*="policy"]', '[id*="legal"]',
+      
+      // Section selectors
+      'section', 'div.section', '.text-content', '.page-content'
+    ];
+
+    // Search by selectors
+    selectors.forEach(selector => {
+      try {
+        const found = document.querySelectorAll(selector);
+        found.forEach(el => {
+          if (this.hasLegalContent(el)) {
+            elements.push(el);
+          }
+        });
+      } catch (e) {
+        // Skip invalid selectors
+      }
+    });
+
+    // Search all divs and sections for legal content
+    const allContainers = document.querySelectorAll('div, section, article');
+    allContainers.forEach(el => {
+      const text = el.textContent.toLowerCase();
+      const score = this.calculateLegalScore(text);
+      if (score > 5) { // Threshold for legal content
+        elements.push(el);
+      }
+    });
+
+    // Remove duplicates and nested elements
+    return this.filterUniqueElements(elements);
+  }
+
+  hasLegalContent(element) {
+    const text = element.textContent.toLowerCase();
+    const score = this.calculateLegalScore(text);
+    return score > 3; // Lower threshold for initial detection
+  }
+
+  calculateLegalScore(text) {
+    let score = 0;
+    this.legalKeywords.forEach(keyword => {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+      const matches = text.match(regex);
+      if (matches) {
+        score += matches.length;
+      }
+    });
+    return score;
+  }
+
+  extractSectionContent(element) {
+    // Find section heading
+    const heading = this.findSectionHeading(element);
+    
+    // Extract and clean content
+    const content = this.cleanTextContent(element);
+    
+    // Calculate relevance score
+    const relevanceScore = this.calculateLegalScore(content.toLowerCase());
+    
+    // Extract subsections if any
+    const subsections = this.extractSubsections(element);
+    
+    return {
+      heading: heading,
+      content: content,
+      subsections: subsections,
+      relevanceScore: relevanceScore,
+      element: element
+    };
+  }
+
+  findSectionHeading(element) {
+    // Look for headings within or before the element
+    const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    if (headings.length > 0) {
+      return headings[0].textContent.trim();
+    }
+    
+    // Check previous sibling for heading
+    let prev = element.previousElementSibling;
+    while (prev) {
+      if (prev.tagName && prev.tagName.match(/^H[1-6]$/)) {
+        return prev.textContent.trim();
+      }
+      prev = prev.previousElementSibling;
+    }
+    
+    // Check parent for heading
+    const parent = element.parentElement;
+    if (parent) {
+      const parentHeading = parent.querySelector('h1, h2, h3, h4, h5, h6');
+      if (parentHeading && !element.contains(parentHeading)) {
+        return parentHeading.textContent.trim();
+      }
+    }
+    
+    // Generate heading from content
+    const firstWords = element.textContent.trim().split(/\s+/).slice(0, 5).join(' ');
+    return firstWords.length > 50 ? firstWords.substring(0, 50) + '...' : firstWords;
+  }
+
+  extractSubsections(element) {
+    const subsections = [];
+    const subHeadings = element.querySelectorAll('h3, h4, h5, h6, strong, b');
+    
+    subHeadings.forEach(heading => {
+      const text = heading.textContent.trim();
+      if (text.length > 3 && text.length < 100) {
+        const content = this.getFollowingContent(heading);
+        if (content) {
+          subsections.push({
+            title: text,
+            content: content
+          });
+        }
+      }
+    });
+    
+    return subsections;
+  }
+
+  getFollowingContent(heading) {
+    let content = '';
+    let sibling = heading.nextSibling;
+    let charCount = 0;
+    const maxChars = 1000;
+    
+    while (sibling && charCount < maxChars) {
+      if (sibling.nodeType === Node.TEXT_NODE) {
+        content += sibling.textContent;
+        charCount += sibling.textContent.length;
+      } else if (sibling.nodeType === Node.ELEMENT_NODE) {
+        // Stop at next heading
+        if (sibling.tagName && sibling.tagName.match(/^(H[1-6]|STRONG|B)$/)) {
+          break;
+        }
+        const text = sibling.textContent || '';
+        content += ' ' + text;
+        charCount += text.length;
+      }
+      sibling = sibling.nextSibling;
+    }
+    
+    return content.trim();
+  }
+
+  cleanTextContent(element) {
+    // Clone to avoid modifying the original page
+    const clone = element.cloneNode(true);
+    
+    // Remove scripts, styles, and other non-content elements
+    const removeElements = clone.querySelectorAll('script, style, noscript, iframe, nav, header, footer, aside, .advertisement, .ad, .social-share, button, input, form');
+    removeElements.forEach(el => el.remove());
+
+    // Add newlines after block elements to preserve structure before getting textContent
+    const blockElements = clone.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li, br, tr, section');
+    blockElements.forEach(el => {
+        el.appendChild(document.createTextNode('\n'));
+    });
+
+    let text = clone.textContent || '';
+    
+    // Clean up whitespace while preserving paragraph breaks
+    text = text
+      .replace(/[ \t]+/g, ' ')      // Collapse multiple spaces/tabs into a single space
+      .replace(/ \n/g, '\n')        // Remove space before a newline
+      .replace(/\n /g, '\n')        // Remove space after a newline
+      .replace(/\n{3,}/g, '\n\n')   // Collapse 3+ newlines into 2 (a paragraph break)
+      .trim();
+    
+    return text;
+  }
+
+  filterUniqueElements(elements) {
+    const unique = [];
+    const processed = new Set();
+    
+    elements.forEach(el => {
+      // Skip if already processed
+      if (processed.has(el)) return;
+      
+      // Skip if parent is already in the list
+      let hasParentInList = false;
+      unique.forEach(existing => {
+        if (existing.contains(el)) {
+          hasParentInList = true;
+        }
+      });
+      
+      if (!hasParentInList) {
+        // Remove any children that are already in the list
+        unique.forEach((existing, index) => {
+          if (el.contains(existing)) {
+            unique.splice(index, 1);
+          }
+        });
+        
+        unique.push(el);
+        processed.add(el);
+      }
+    });
+    
+    return unique;
+  }
+
+  processLegalText(text) {
+    // Split into paragraphs
+    const paragraphs = text.split(/\n\n+/);
+    const sections = [];
+    let currentSection = null;
+    
+    paragraphs.forEach(para => {
+      // Check if this is a heading
+      if (this.isLikelyHeading(para)) {
+        if (currentSection) {
+          sections.push(currentSection);
+        }
+        currentSection = {
+          heading: para,
+          content: []
+        };
+      } else {
+        if (!currentSection) {
+          currentSection = {
+            heading: 'Legal Text',
+            content: []
+          };
+        }
+        currentSection.content.push(para);
+      }
+    });
+    
+    if (currentSection) {
+      sections.push(currentSection);
+    }
+    
+    return {
+      text: text,
+      sections: sections
+    };
+  }
+
+  isLikelyHeading(text) {
+    // Check if text is likely a heading
+    return (
+      text.length < 100 &&
+      (text === text.toUpperCase() ||
+       text.match(/^\d+\.?\s+[A-Z]/) ||
+       text.match(/^[A-Z][A-Z\s]+$/) ||
+       this.legalKeywords.some(keyword => 
+         text.toLowerCase().includes(keyword) && text.split(' ').length < 10
+       ))
+    );
+  }
+
+  formatLegalSections(sections) {
+    let formattedText = '';
+    const formattedSections = [];
+    
+    sections.forEach((section, index) => {
+      const sectionNumber = index + 1;
+      
+      // Add section heading
+      if (section.heading) {
+        formattedText += `\n\n## ${sectionNumber}. ${section.heading}\n\n`;
+      }
+      
+      // Add section content
+      formattedText += section.content;
+      
+      // Add subsections
+      if (section.subsections && section.subsections.length > 0) {
+        section.subsections.forEach(sub => {
+          formattedText += `\n\n### ${sub.title}\n\n${sub.content}`;
+        });
+      }
+      
+      // Store formatted section
+      formattedSections.push({
+        number: sectionNumber,
+        heading: section.heading,
+        content: section.content,
+        subsections: section.subsections,
+        relevanceScore: section.relevanceScore
+      });
+    });
+    
+    return {
+      text: formattedText.trim(),
+      sections: formattedSections
+    };
+  }
+}
+
+// Initialize the legal text extractor
+if (typeof window !== 'undefined' && window.document) {
+  new LegalTextExtractor();
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => new TermsDetector());
 } else {
