@@ -97,14 +97,45 @@ class LegalChatApp {
     }
 
     async init() {
-        // Try to load from extension storage first
-        const loadedFromStorage = await this.loadExtractedData();
-        
-        // If nothing was loaded, load the default mock document
-        if (!loadedFromStorage) {
+    try {
+        // Ensure we are in a Chrome extension environment
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            
+            // 1. Fetch all necessary data, including the timestamp
+            const data = await chrome.storage.local.get(['extractedText', 'extractedTitle', 'timestamp']);
+            
+            if (data.extractedText) {
+                // 2. Set this.extractedData correctly for use in other functions (e.g., for showing the timestamp)
+                this.extractedData = {
+                    text: data.extractedText,
+                    title: data.extractedTitle || 'Extracted Content',
+                    timestamp: data.timestamp
+                };
+                
+                // 3. Create the object with the structure that displayProcessedContent expects
+                const processedDocument = {
+                    content: data.extractedText, 
+                    title: data.extractedTitle || 'Extracted Content'
+                };
+                
+                // 4. Set the title and display the content
+                this.setDocumentTitle(processedDocument.title);
+                this.displayProcessedContent(processedDocument);
+
+            } else {
+                // If no extracted text is found in storage, load the default document
+                this.loadDocument();
+            }
+        } else {
+            // Fallback for non-extension environments
             this.loadDocument();
         }
+    } catch (error) {
+        console.error('Error loading extracted content:', error);
+        // If there's an error, load the default document as a fallback
+        this.loadDocument();
     }
+}
 
     _formatTextToHtml(text) {
         // Sanitize text to prevent rendering unintended HTML
@@ -169,29 +200,6 @@ class LegalChatApp {
         return false;
     }
 
-    async sendDocumentToBackend(text) {
-        try {
-            const response = await fetch(`${this.API_BASE_URL}${this.DOCUMENT_ENDPOINT}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ text: text }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error sending document to backend:', error);
-            // Return the original text if API call fails
-            return { content: text, title: 'Processed Document' };
-        }
-    }
-
     displayProcessedContent(processedDocument) {
         if (!processedDocument) return;
 
@@ -220,12 +228,6 @@ class LegalChatApp {
             
             this.renderAllDocumentViews();
         }
-    }
-
-    handleExtractedContentClick(content) {
-        const question = `Explain this content: ${content}`;
-        this.messageInput.value = question;
-        this.handleSendMessage();
     }
 
     switchToMode(mode) {
@@ -475,33 +477,11 @@ class LegalChatApp {
     }
 
     async loadDocument() {
-        this.isLoadingDocument = true;
-        this.setDocumentLoading(true);
-
-        try {
-            const documentData = await this.fetchLegalDocument();
-            this.setDocumentTitle(documentData.title);
-            
-            // Parse content into clauses
-            const clauses = documentData.content
-                .split('\n\n')
-                .filter(clause => clause.trim().length > 0)
-                .map((clause, index) => ({
-                    id: `clause-${index}`,
-                    text: clause.trim(),
-                    index: index + 1
-                }));
-            
-            this.document = clauses;
-            this.renderAllDocumentViews();
-        } catch (error) {
-            console.error('Error loading document:', error);
-            this.setDocumentTitle('Error Loading Document');
-            this.showDocumentError();
-        } finally {
-            this.isLoadingDocument = false;
-            this.setDocumentLoading(false);
-        }
+        // This function is now a fallback that shows a clear message.
+        this.isLoadingDocument = false;
+        this.setDocumentLoading(false);
+        this.setDocumentTitle('No Document Loaded');
+        this.showDocumentError('Please upload a document using the extension icon to get started.');
     }
 
     setDocumentTitle(title) {
@@ -586,39 +566,19 @@ class LegalChatApp {
         this.handleSendMessage();
     }
 
-    async fetchLegalDocument() {
-        // Mock document - replace with actual API call
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    title: 'Terms and Conditions',
-                    content: `By using this service, you agree to be bound by these terms and conditions. These terms constitute a legal agreement between you and the company.
-
-The company reserves the right to modify these terms at any time without prior notice. Continued use of the service constitutes acceptance of modified terms.
-
-All intellectual property rights in the service and its content are owned by the company. Users may not reproduce, distribute, or create derivative works.
-
-The service is provided "as is" without any warranties. The company disclaims all liability for damages arising from use of the service.
-
-Users are responsible for maintaining the confidentiality of their account credentials and for all activities under their account.`
-                });
-            }, 1000);
-        });
-    }
-
-    showDocumentLoading() {
-        const loadingHtml = `
-            <div class="loading-document">
-                <div>
-                    <div class="spinner"></div>
-                    <p>Loading document from API...</p>
+    showDocumentError(message = 'Failed to load document. Please try refreshing.') {
+        const errorHtml = `
+            <div class="clause" style="cursor: default;">
+                <div class="clause-content">
+                    <div class="clause-number" style="background: #fee2e2; color: #b91c1c;">!</div>
+                    <div class="clause-text">${this.escapeHtml(message)}</div>
                 </div>
             </div>
         `;
         
-        if (this.documentContentElement) this.documentContentElement.innerHTML = loadingHtml;
-        if (this.readDocumentContent) this.readDocumentContent.innerHTML = loadingHtml;
-        if (this.focusClauseContent) this.focusClauseContent.innerHTML = loadingHtml;
+        if (this.documentContentElement) this.documentContentElement.innerHTML = errorHtml;
+        if (this.readDocumentContent) this.readDocumentContent.innerHTML = errorHtml;
+        if (this.focusClauseContent) this.focusClauseContent.innerHTML = errorHtml;
     }
 
     showDocumentError() {

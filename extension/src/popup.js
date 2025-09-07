@@ -680,31 +680,22 @@ class TextExtractor {
 
   initializeEventListeners() {
     document.getElementById("extractPage").addEventListener("click", () => {
-      this.extractPageText();
+        this.extractPageText();
     });
 
-    document
-      .getElementById("extractSelection")
-      .addEventListener("click", () => {
+    document.getElementById("extractSelection").addEventListener("click", () => {
         this.extractSelection();
-      });
-
-    document.getElementById("uploadImage").addEventListener("click", () => {
-      document.getElementById("imageFile").click();
     });
 
-    document.getElementById("uploadPdf").addEventListener("click", () => {
-      document.getElementById("pdfFile").click();
+    // Replace image/PDF upload with document upload
+    document.getElementById("uploadDocument").addEventListener("click", () => {
+        document.getElementById("documentFile").click();
     });
 
-    document.getElementById("imageFile").addEventListener("change", (e) => {
-      this.handleImageUpload(e.target.files[0]);
+    document.getElementById("documentFile").addEventListener("change", (e) => {
+        this.handleDocumentUpload(e.target.files[0]);
     });
-
-    document.getElementById("pdfFile").addEventListener("change", (e) => {
-      this.handlePdfUpload(e.target.files[0]);
-    });
-  }
+}
 
   showStatus(message, type = "") {
     this.status.textContent = message;
@@ -804,126 +795,56 @@ class TextExtractor {
     }
   }
 
-  async handleImageUpload(file) {
+  async handleDocumentUpload(file) {
     if (!file) return;
 
-    this.showStatus("Processing image...", "loading");
+    this.showStatus("Uploading document...", "loading");
 
     try {
-      const dataUrl = await this.convertFileToDataUrl(file);
+        const formData = new FormData();
+        formData.append('document', file);
 
-      // Store image data instead of extracting text
-      await this.showFileViewer(dataUrl, "image", `Image: ${file.name}`);
-      this.showStatus("✅ Image loaded!", "success");
-    } catch (error) {
-      console.error("Error processing image:", error);
-      this.showStatus("❌ Failed to process image", "error");
-    }
-  }
+        const response = await fetch('http://localhost:3000/api/ai/document', {
+            method: 'POST',
+            body: formData
+        });
 
-  async handlePdfUpload(file) {
-    if (!file) return;
-
-    this.showStatus("Processing PDF...", "loading");
-
-    try {
-      const dataUrl = await this.convertFileToDataUrl(file);
-
-      // Store PDF data instead of extracting text
-      await this.showFileViewer(dataUrl, "pdf", `PDF: ${file.name}`);
-      this.showStatus("✅ PDF loaded!", "success");
-    } catch (error) {
-      console.error("Error processing PDF:", error);
-      this.showStatus("❌ Failed to process PDF", "error");
-    }
-  }
-  async handlePdfUpload(file) {
-    if (!file) return;
-
-    this.showStatus("Processing PDF...", "loading");
-
-    try {
-      const dataUrl = await this.convertFileToDataUrl(file);
-
-      // Store PDF data instead of extracting text
-      await this.showFileViewer(dataUrl, "pdf", `PDF: ${file.name}`);
-      this.showStatus("✅ PDF loaded!", "success");
-    } catch (error) {
-      console.error("Error processing PDF:", error);
-      this.showStatus("❌ Failed to process PDF", "error");
-    }
-  }
-
-  async extractTextFromImage(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-
-            // Simple OCR simulation - in real implementation, you'd use Tesseract.js
-            // For now, we'll try to detect if it's a screenshot with text
-            const imageData = ctx.getImageData(
-              0,
-              0,
-              canvas.width,
-              canvas.height
-            );
-
-            // This is a placeholder - real OCR would go here
-            resolve(
-              "OCR functionality would be implemented here using Tesseract.js or similar library. The image has been processed and text extraction would occur here."
-            );
-          } catch (error) {
-            reject(error);
-          }
-        };
-        img.onerror = reject;
-        img.src = e.target.result;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async extractTextFromPdf(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          // This would typically use PDF.js library
-          // For demonstration, we'll simulate PDF text extraction
-          resolve(`PDF text extraction would be implemented here using PDF.js library. 
-                    
-File: ${file.name}
-Size: ${(file.size / 1024).toFixed(2)} KB
-Type: ${file.type}
-
-The PDF content would be extracted and displayed here with proper formatting.`);
-        } catch (error) {
-          reject(error);
+        if (!response.ok) {
+            throw new Error(`Upload failed: ${response.status}`);
         }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
-  }
 
-  convertFileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || "Failed to process document");
+        }
+
+        // Store the processed content
+        await chrome.storage.local.set({
+            extractedText: result.content,
+            extractedTitle: result.title || `Uploaded: ${file.name}`,
+            timestamp: Date.now(),
+        });
+
+        // Open the viewer
+        chrome.windows.create({
+            url: chrome.runtime.getURL("viewer.html"),
+            type: "popup",
+            width: 800,
+            height: 600,
+            left: 100,
+            top: 100,
+        });
+
+        this.showStatus("✅ Document processed!", "success");
+    } catch (error) {
+        console.error("Error uploading document:", error);
+        this.showStatus(`❌ ${error.message}`, "error");
+    }
+}
+
+
+  
 
   async showFileViewer(fileData, fileType, title) {
     // Store the file data

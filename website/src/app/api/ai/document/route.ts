@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-
   try {
     const { messages } = await request.json();
 
     const systemPrompt = {
       role: "system",
-      content: `You are an AI that analyzes Terms and Conditions text for potential risks. Your only job is to classify each detected risk into severity levels: Low, Medium, or High.
+      content: `Extract all text content from this document while preserving formatting, structure, and document integrity. Return ONLY the extracted formatted text without any additional commentary.`
 
-                Output must only contain the severity levels in a comma-separated list.
-                Do not explain, justify, or provide text excerpts.
-                Do not include anything except the severity levels.
-                Example:
-                Input: Terms and Conditions text
-                Output: Low, High, Medium`
-    }
+    };
+
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
         { error: "Invalid messages format" },
@@ -23,16 +17,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        "model": "google/gemini-2.0-flash-exp:free",
-        "messages": [systemPrompt, ...messages]
-      })
+        model: "llama-3.1-8b-instant", // free + fast
+        messages: [systemPrompt, ...messages],
+      }),
     });
 
     if (!response.ok) {

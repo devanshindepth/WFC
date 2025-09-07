@@ -229,7 +229,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       timestamp: Date.now()
     }, () => {
       chrome.tabs.create({
-        url: chrome.runtime.getURL("readmode.html")
+        url: chrome.runtime.getURL("viewer.html")
       });
     });
   }
