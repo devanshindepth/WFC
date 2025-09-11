@@ -1,60 +1,120 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages } = await request.json();
+    const { messages, text } = await request.json();
 
-    const systemPrompt = {
-      role: "system",
-      content: `You are an AI assistant specialized in legal topics.
+    // Handle both text input and chat messages
+    let userContent = '';
 
-1. If the user provides Terms and Conditions text:
-   - Analyze the text for potential risks.
-   - Classify each detected risk into severity levels: Low, Medium, or High.
-   - Output must only contain the severity levels in a comma-separated list.
-   - Do not explain, justify, or provide text excerpts.
-   - Example:
-     Input: Terms and Conditions text
-     Output: Low, High, Medium
-
-2. If the user asks about general legal concepts, laws, or sections (e.g., Indian Penal Code, contracts, compliance):
-   - Provide a concise, factual explanation in plain language.
-
-3. If the user asks about non-legal topics (e.g., programming, cooking, sports, tech):
-   - Reply strictly with: "I deal with only legal terms and conditions and legal documentations."`
-
-    };
-
-    if (!messages || !Array.isArray(messages)) {
+    if (text) {
+      // Direct text analysis
+      userContent = text;
+    } else if (messages && Array.isArray(messages)) {
+      // Chat format - get the last user message
+      const lastUserMessage = messages[messages.length - 1];
+      userContent = lastUserMessage ? lastUserMessage.content : '';
+    } else {
       return NextResponse.json(
-        { error: "Invalid messages format" },
-        { status: 400 }
+        { error: "Invalid input format. Provide either 'text' or 'messages'." },
+        { status: 400 },
       );
     }
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
+    if (!userContent.trim()) {
+      return NextResponse.json({ error: 'No content provided for analysis' }, { status: 400 });
+    }
+
+    // Check API key
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          error: 'Google Gemini API key not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY in your environment variables.',
+        },
+        { status: 500 },
+      );
+    }
+
+    // Create friendly system prompt
+    const systemPrompt = `You are a friendly legal assistant named "LegalPal" who helps people understand legal terms and consumer rights. Explain things in simple, everyday language like a helpful friend would.
+
+Key guidelines:
+- Be friendly and approachable
+- Use simple analogies when explaining complex terms
+- Always prioritize consumer protection
+- If something is risky for consumers, clearly explain why
+- Ask follow-up questions to better help users
+- Keep responses conversational, not robotic
+
+For legal questions, provide clear, practical advice focused on protecting user rights.`;
+
+    // Make direct API call to Google Gemini
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant", // free + fast
-        messages: [systemPrompt, ...messages],
-      }),
+        contents: [{
+          parts: [
+            { text: `${systemPrompt}\n\nUser question: ${userContent}` }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2048,
+        }
+      })
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      return NextResponse.json({ error }, { status: response.status });
+      const errorData = await response.text();
+      console.error('Gemini API error:', errorData);
+      return NextResponse.json(
+        { error: 'Failed to get response from AI service' },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      return NextResponse.json(
+        { error: 'No response generated from AI' },
+        { status: 500 }
+      );
+    }
+
+    const aiResponse = data.candidates[0].content.parts[0].text;
+
+    // Return in OpenAI-compatible format for easier integration
+    return NextResponse.json({
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: aiResponse,
+          },
+        },
+      ],
+      usage: {
+        promptTokens: Math.ceil(userContent.length / 4), // Rough estimate
+        completionTokens: Math.ceil(aiResponse.length / 4),
+        totalTokens: Math.ceil((userContent.length + aiResponse.length) / 4)
+      },
+      model: 'gemini-1.5-flash-latest',
+    });
+
   } catch (error) {
+    console.error('Legal chat error:', error);
     return NextResponse.json(
-      { error: "Internal server error", details: error },
-      { status: 500 }
+      {
+        error: 'Failed to process your legal question',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        suggestion: 'Try rephrasing your question or check back in a moment!',
+      },
+      { status: 500 },
     );
   }
 }
