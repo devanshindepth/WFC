@@ -13,7 +13,7 @@ class LegalChatApp {
         
         this.API_BASE_URL = 'http://localhost:3000';
         this.AI_ENDPOINT = '/api/ai/chat';
-        this.DOCUMENT_ENDPOINT = '/api/ai/document';
+        this.DOCUMENT_ENDPOINT = '/api/ai/extraction';
         
         this.initializeElements();
         this.attachEventListeners();
@@ -97,89 +97,177 @@ class LegalChatApp {
     }
 
     async init() {
-    try {
-        // Ensure we are in a Chrome extension environment
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-            
-            // Fetch all necessary data, including additional metadata
-            const data = await chrome.storage.local.get([
-                'extractedText', 
-                'extractedTitle', 
-                'timestamp', 
-                'fileName', 
-                'fileType', 
-                'extractionTimestamp'
-            ]);
-            
-            if (data.extractedText) {
-                // Set this.extractedData with comprehensive metadata
-                this.extractedData = {
-                    text: data.extractedText,
-                    title: data.extractedTitle || 'Extracted Content',
-                    timestamp: data.timestamp,
-                    fileName: data.fileName,
-                    fileType: data.fileType,
-                    extractionTimestamp: data.extractionTimestamp
-                };
+        try {
+            // Ensure we are in a Chrome extension environment
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
                 
-                // Create the object with the structure that displayProcessedContent expects
-                const processedDocument = {
-                    content: data.extractedText, 
-                    title: data.extractedTitle || 'Extracted Content'
-                };
+                // Fetch all necessary data, including additional metadata
+                const data = await chrome.storage.local.get([
+                    'extractedText', 
+                    'extractedTitle', 
+                    'timestamp', 
+                    'fileName', 
+                    'fileType', 
+                    'extractionTimestamp'
+                ]);
                 
-                // Set the title and display the content
-                this.setDocumentTitle(processedDocument.title);
-                this.displayProcessedContent(processedDocument);
+                if (data.extractedText && data.extractedText.trim()) {
+                    // Set this.extractedData with comprehensive metadata
+                    this.extractedData = {
+                        text: data.extractedText.trim(),
+                        title: data.extractedTitle || data.fileName || 'Extracted Document',
+                        timestamp: data.timestamp || data.extractionTimestamp || Date.now(),
+                        fileName: data.fileName,
+                        fileType: data.fileType,
+                        extractionTimestamp: data.extractionTimestamp
+                    };
+                    
+                    // Create the object with the structure that displayProcessedContent expects
+                    const processedDocument = {
+                        content: this.extractedData.text, 
+                        title: this.extractedData.title
+                    };
+                    
+                    // Set the title and display the content
+                    this.setDocumentTitle(processedDocument.title);
+                    this.displayProcessedContent(processedDocument);
 
-                console.log('Successfully loaded extracted document:', {
-                    title: this.extractedData.title,
-                    textLength: this.extractedData.text.length,
-                    timestamp: new Date(this.extractedData.timestamp).toLocaleString()
-                });
+                    console.log('Successfully loaded extracted document:', {
+                        title: this.extractedData.title,
+                        textLength: this.extractedData.text.length,
+                        timestamp: new Date(this.extractedData.timestamp).toLocaleString(),
+                        fileName: this.extractedData.fileName,
+                        fileType: this.extractedData.fileType
+                    });
 
+                } else {
+                    // If no extracted text is found in storage, show appropriate message
+                    console.log('No extracted text found in storage');
+                    this.loadDocument();
+                }
             } else {
-                // If no extracted text is found in storage, show appropriate message
+                // Fallback for non-extension environments
+                console.log('Chrome storage not available - running outside extension');
                 this.loadDocument();
             }
-        } else {
-            // Fallback for non-extension environments
-            this.loadDocument();
+        } catch (error) {
+            console.error('Error loading extracted content:', error);
+            // If there's an error, show error message and load fallback
+            this.showDocumentError('Error loading document content. Please try uploading again.');
         }
-    } catch (error) {
-        console.error('Error loading extracted content:', error);
-        // If there's an error, show error message and load fallback
-        this.showDocumentError('Error loading document content. Please try uploading again.');
     }
-}
 
     _formatTextToHtml(text) {
+        if (!text || !text.trim()) {
+            return '<p>No content available to display.</p>';
+        }
+
         // Sanitize text to prevent rendering unintended HTML
         let safeText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
         // Split the entire text into blocks based on double newlines (paragraphs)
-        const blocks = safeText.split(/\n\n+/);
+        const blocks = safeText.split(/\n\s*\n/).filter(block => block.trim());
         
         let html = '';
         
         blocks.forEach(block => {
             const trimmedBlock = block.trim();
             if (trimmedBlock) {
-                if (trimmedBlock.startsWith('## ')) {
-                    // It's a main heading (H2)
-                    html += `<h2>${trimmedBlock.substring(3)}</h2>`;
+                // Enhanced heading detection
+                if (trimmedBlock.startsWith('# ')) {
+                    // Main heading (H1)
+                    html += `<h1 class="document-heading-1">${trimmedBlock.substring(2)}</h1>`;
+                } else if (trimmedBlock.startsWith('## ')) {
+                    // Sub heading (H2)
+                    html += `<h2 class="document-heading-2">${trimmedBlock.substring(3)}</h2>`;
                 } else if (trimmedBlock.startsWith('### ')) {
-                    // It's a sub-heading (H3)
-                    html += `<h3>${trimmedBlock.substring(4)}</h3>`;
+                    // Sub-sub heading (H3)
+                    html += `<h3 class="document-heading-3">${trimmedBlock.substring(4)}</h3>`;
+                } else if (trimmedBlock.startsWith('#### ')) {
+                    // Minor heading (H4)
+                    html += `<h4 class="document-heading-4">${trimmedBlock.substring(5)}</h4>`;
+                } else if (trimmedBlock.match(/^[A-Z][A-Z\s]{5,50}$/) && trimmedBlock.length < 100) {
+                    // All caps text that looks like a heading
+                    html += `<h3 class="document-heading-caps">${trimmedBlock}</h3>`;
+                } else if (trimmedBlock.startsWith('- ') || trimmedBlock.startsWith('* ') || trimmedBlock.match(/^\d+\.\s/)) {
+                    // List items - convert to proper HTML lists
+                    const listItems = trimmedBlock.split('\n').filter(line => line.trim());
+                    const isNumbered = listItems[0].match(/^\d+\.\s/);
+                    const listTag = isNumbered ? 'ol' : 'ul';
+                    
+                    const listHtml = listItems.map(item => {
+                        const cleanItem = item.replace(/^[-*]\s|^\d+\.\s/, '').trim();
+                        return `<li>${cleanItem}</li>`;
+                    }).join('');
+                    
+                    html += `<${listTag} class="document-list">${listHtml}</${listTag}>`;
                 } else {
-                    // It's a paragraph. Replace single newlines within the paragraph with <br>.
+                    // Regular paragraph - preserve line breaks within paragraphs
                     const paragraphHtml = trimmedBlock.replace(/\n/g, '<br>');
-                    html += `<p>${paragraphHtml}</p>`;
+                    html += `<p class="document-paragraph">${paragraphHtml}</p>`;
                 }
             }
         });
         
-        return html || '<p>No legal text found or content is empty.</p>';
+        // Add some basic styling for better readability
+        const styledHtml = `
+            <div class="formatted-document-content">
+                ${html}
+            </div>
+            <style>
+                .formatted-document-content {
+                    line-height: 1.6;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                }
+                .document-heading-1 {
+                    font-size: 1.5em;
+                    font-weight: bold;
+                    margin: 1.5em 0 0.5em 0;
+                    color: #1f2937;
+                    border-bottom: 2px solid #e5e7eb;
+                    padding-bottom: 0.25em;
+                }
+                .document-heading-2 {
+                    font-size: 1.3em;
+                    font-weight: bold;
+                    margin: 1.25em 0 0.5em 0;
+                    color: #374151;
+                }
+                .document-heading-3 {
+                    font-size: 1.1em;
+                    font-weight: bold;
+                    margin: 1em 0 0.5em 0;
+                    color: #4b5563;
+                }
+                .document-heading-4 {
+                    font-size: 1em;
+                    font-weight: bold;
+                    margin: 0.75em 0 0.25em 0;
+                    color: #6b7280;
+                }
+                .document-heading-caps {
+                    font-size: 1.1em;
+                    font-weight: bold;
+                    margin: 1em 0 0.5em 0;
+                    color: #4b5563;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+                .document-paragraph {
+                    margin: 0.75em 0;
+                    text-align: justify;
+                }
+                .document-list {
+                    margin: 0.75em 0;
+                    padding-left: 1.5em;
+                }
+                .document-list li {
+                    margin: 0.25em 0;
+                }
+            </style>
+        `;
+        
+        return styledHtml;
     }
 
     async loadExtractedData() {
@@ -217,29 +305,106 @@ class LegalChatApp {
     }
 
     displayProcessedContent(processedDocument) {
-        if (!processedDocument) {
+        if (!processedDocument || !processedDocument.content) {
             this.showDocumentError('No document content available to display.');
             return;
         }
 
-        // Parse the processed content into clauses for document structure
-        if (processedDocument.content) {
-            const paragraphs = processedDocument.content.split('\n\n').filter(p => p.trim());
-            
-            // Update document array for consistency with better structure
-            this.document = paragraphs.map((paragraph, index) => ({
-                id: `clause-${index}`,
-                text: paragraph.trim(),
-                index: index + 1
-            }));
-            
-            // Render all document views with the extracted content
-            this.renderAllDocumentViews();
-            
-            console.log(`Document processed: ${this.document.length} sections found`);
-        } else {
+        const content = processedDocument.content.trim();
+        if (!content) {
             this.showDocumentError('Document content is empty or could not be processed.');
+            return;
         }
+
+        // Enhanced parsing for better structure detection
+        // Split by double newlines first to get major sections
+        const majorSections = content.split(/\n\s*\n/).filter(section => section.trim());
+        
+        // Process each section to create meaningful document structure
+        this.document = [];
+        let sectionIndex = 1;
+        
+        majorSections.forEach(section => {
+            const trimmedSection = section.trim();
+            if (trimmedSection) {
+                // Check if this looks like a heading (starts with #, all caps, or is very short)
+                const isHeading = trimmedSection.match(/^#{1,6}\s/) || 
+                                 (trimmedSection.length < 100 && trimmedSection === trimmedSection.toUpperCase()) ||
+                                 trimmedSection.match(/^[A-Z][A-Z\s]{5,50}$/);
+                
+                // For headings, keep them as single sections
+                if (isHeading) {
+                    this.document.push({
+                        id: `section-${sectionIndex}`,
+                        text: trimmedSection,
+                        index: sectionIndex,
+                        type: 'heading'
+                    });
+                    sectionIndex++;
+                } else {
+                    // For regular content, split by sentences if it's very long
+                    if (trimmedSection.length > 500) {
+                        // Split long paragraphs by sentences for better readability
+                        const sentences = trimmedSection.split(/(?<=[.!?])\s+/).filter(s => s.trim());
+                        let currentChunk = '';
+                        
+                        sentences.forEach(sentence => {
+                            if (currentChunk.length + sentence.length > 400 && currentChunk) {
+                                // Save current chunk and start new one
+                                this.document.push({
+                                    id: `section-${sectionIndex}`,
+                                    text: currentChunk.trim(),
+                                    index: sectionIndex,
+                                    type: 'content'
+                                });
+                                sectionIndex++;
+                                currentChunk = sentence;
+                            } else {
+                                currentChunk += (currentChunk ? ' ' : '') + sentence;
+                            }
+                        });
+                        
+                        // Add remaining chunk
+                        if (currentChunk.trim()) {
+                            this.document.push({
+                                id: `section-${sectionIndex}`,
+                                text: currentChunk.trim(),
+                                index: sectionIndex,
+                                type: 'content'
+                            });
+                            sectionIndex++;
+                        }
+                    } else {
+                        // Keep shorter paragraphs as single sections
+                        this.document.push({
+                            id: `section-${sectionIndex}`,
+                            text: trimmedSection,
+                            index: sectionIndex,
+                            type: 'content'
+                        });
+                        sectionIndex++;
+                    }
+                }
+            }
+        });
+        
+        // Ensure we have at least one section
+        if (this.document.length === 0) {
+            this.document.push({
+                id: 'section-1',
+                text: content,
+                index: 1,
+                type: 'content'
+            });
+        }
+        
+        // Render all document views with the extracted content
+        this.renderAllDocumentViews();
+        
+        console.log(`Document processed: ${this.document.length} sections found`, {
+            headings: this.document.filter(d => d.type === 'heading').length,
+            content: this.document.filter(d => d.type === 'content').length
+        });
     }
 
     switchToMode(mode) {
@@ -293,21 +458,149 @@ class LegalChatApp {
 
     updateFocusMode() {
         if (this.document.length > 0 && this.currentClauseIndex < this.document.length) {
-            const clause = this.document[this.currentClauseIndex];
-            this.focusClauseCounter.textContent = `Clause ${this.currentClauseIndex + 1} of ${this.document.length}`;
+            const section = this.document[this.currentClauseIndex];
+            const sectionType = section.type === 'heading' ? 'Heading' : 'Section';
+            
+            this.focusClauseCounter.textContent = `${sectionType} ${this.currentClauseIndex + 1} of ${this.document.length}`;
+            
+            // Enhanced focus display with better styling and section type awareness
+            const sectionIcon = section.type === 'heading' ? 'Head' : 'Clause';
+            const sectionClass = section.type === 'heading' ? 'focus-heading' : 'focus-content';
             
             this.focusClauseContent.innerHTML = `
-                <div class="focus-clause" data-clause-id="${clause.id}">
-                    <div class="focus-clause-content">
-                        <span class="focus-clause-number">${clause.index}</span>
-                        <div class="focus-clause-text">${this.escapeHtml(clause.text)}</div>
+                <div class="focus-section ${sectionClass}" data-section-id="${section.id}">
+                    <div class="focus-section-header">
+                        <span class="focus-section-icon">${sectionIcon}</span>
+                        <span class="focus-section-type">${sectionType} ${section.index}</span>
+                        <button class="focus-explain-btn" data-section-id="${section.id}">
+                            💬 Explain This
+                        </button>
+                    </div>
+                    <div class="focus-section-content">
+                        <div class="focus-section-text">${this.escapeHtml(section.text)}</div>
                     </div>
                 </div>
+                <style>
+                    .focus-section {
+                        background: #ffffff;
+                        border-radius: 0.75rem;
+                        border: 2px solid #e5e7eb;
+                        overflow: hidden;
+                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    }
+                    .focus-heading {
+                        border-color: #059669;
+                        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                    }
+                    .focus-content {
+                        border-color: #3b82f6;
+                        background: #ffffff;
+                    }
+                    .focus-section-header {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.75rem;
+                        padding: 1rem 1.5rem;
+                        background: rgba(0, 0, 0, 0.02);
+                        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+                    }
+                    .focus-heading .focus-section-header {
+                        background: rgba(5, 150, 105, 0.1);
+                        border-bottom-color: rgba(5, 150, 105, 0.2);
+                    }
+                    .focus-content .focus-section-header {
+                        background: rgba(59, 130, 246, 0.1);
+                        border-bottom-color: rgba(59, 130, 246, 0.2);
+                    }
+                    .focus-section-icon {
+                        font-size: 1.25rem;
+                    }
+                    .focus-section-type {
+                        font-weight: 600;
+                        color: #1f2937;
+                        flex: 1;
+                    }
+                    .focus-explain-btn {
+                        background: #3b82f6;
+                        color: white;
+                        border: none;
+                        padding: 0.5rem 1rem;
+                        border-radius: 0.375rem;
+                        font-size: 0.875rem;
+                        cursor: pointer;
+                        transition: background-color 0.2s ease;
+                    }
+                    .focus-explain-btn:hover {
+                        background: #2563eb;
+                    }
+                    .focus-heading .focus-explain-btn {
+                        background: #059669;
+                    }
+                    .focus-heading .focus-explain-btn:hover {
+                        background: #047857;
+                    }
+                    .focus-section-content {
+                        padding: 1.5rem;
+                    }
+                    .focus-section-text {
+                        line-height: 1.7;
+                        font-size: 1rem;
+                        color: #374151;
+                        text-align: justify;
+                    }
+                </style>
             `;
+            
+            // Add click handler for the explain button
+            const explainBtn = this.focusClauseContent.querySelector('.focus-explain-btn');
+            if (explainBtn) {
+                explainBtn.addEventListener('click', () => {
+                    this.handleSectionClick(section);
+                });
+            }
             
             // Update navigation button states
             this.prevClauseBtn.disabled = this.currentClauseIndex === 0;
             this.nextClauseBtn.disabled = this.currentClauseIndex === this.document.length - 1;
+            
+            // Update button text to reflect section types
+            this.prevClauseBtn.textContent = this.currentClauseIndex > 0 ? 
+                `← Previous ${this.document[this.currentClauseIndex - 1].type === 'heading' ? 'Heading' : 'Section'}` : 
+                '← Previous';
+            this.nextClauseBtn.textContent = this.currentClauseIndex < this.document.length - 1 ? 
+                `Next ${this.document[this.currentClauseIndex + 1].type === 'heading' ? 'Heading' : 'Section'} →` : 
+                'Next →';
+        } else {
+            // Handle case where no document is loaded
+            this.focusClauseCounter.textContent = 'No content available';
+            this.focusClauseContent.innerHTML = `
+                <div class="focus-no-content">
+                    <div class="no-content-icon">📄</div>
+                    <h3>No Document Loaded</h3>
+                    <p>Please upload a document using the extension popup to use Focus Mode.</p>
+                </div>
+                <style>
+                    .focus-no-content {
+                        text-align: center;
+                        padding: 3rem 1rem;
+                        color: #6b7280;
+                    }
+                    .focus-no-content .no-content-icon {
+                        font-size: 3rem;
+                        margin-bottom: 1rem;
+                    }
+                    .focus-no-content h3 {
+                        margin: 1rem 0 0.5rem 0;
+                        color: #374151;
+                    }
+                    .focus-no-content p {
+                        margin: 0;
+                        font-size: 0.875rem;
+                    }
+                </style>
+            `;
+            this.prevClauseBtn.disabled = true;
+            this.nextClauseBtn.disabled = true;
         }
     }
 
@@ -527,76 +820,295 @@ class LegalChatApp {
         if (this.extractedData?.timestamp) {
             const date = new Date(this.extractedData.timestamp);
             metadataHtml = `
-                <div style="background: #eff6ff; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: #1e40af; border-left: 4px solid #2563eb;">
-                    <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">${this.escapeHtml(this.extractedData.title)}</div>
-                    <div>Extracted on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</div>
-                    ${this.extractedData.fileName ? `<div>File: ${this.escapeHtml(this.extractedData.fileName)}</div>` : ''}
+                <div class="document-metadata">
+                    <div class="metadata-title">${this.escapeHtml(this.extractedData.title)}</div>
+                    <div class="metadata-info">Extracted on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</div>
+                    ${this.extractedData.fileName ? `<div class="metadata-file">File: ${this.escapeHtml(this.extractedData.fileName)}</div>` : ''}
+                    ${this.extractedData.fileType ? `<div class="metadata-type">Type: ${this.escapeHtml(this.extractedData.fileType)}</div>` : ''}
                 </div>
             `;
         }
         
-        const clausesHtml = this.document.map(clause => `
-            <div class="clause" data-clause-id="${clause.id}">
-                <div class="clause-tooltip">Click to explain</div>
-                <div class="clause-content">
-                    <div class="clause-number">${clause.index}</div>
-                    <div class="clause-text">${this.escapeHtml(clause.text)}</div>
+        // Enhanced section rendering with better visual distinction
+        const sectionsHtml = this.document.map(section => {
+            const sectionClass = section.type === 'heading' ? 'document-section heading-section' : 'document-section content-section';
+            const sectionIcon = section.type === 'heading' ? '📋' : '📄';
+            
+            return `
+                <div class="${sectionClass}" data-section-id="${section.id}">
+                    <div class="section-tooltip">Click to discuss this ${section.type}</div>
+                    <div class="section-content">
+                        <div class="section-number">${sectionIcon} ${section.index}</div>
+                        <div class="section-text">${this.escapeHtml(section.text)}</div>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
         this.documentContentElement.innerHTML = `
-            <div>
+            <div class="chat-document-container">
                 ${metadataHtml}
-                ${clausesHtml}
+                <div class="document-sections">
+                    ${sectionsHtml}
+                </div>
                 <div class="tip-box">
-                    <p><strong>💡 Tip:</strong> Click on any numbered clause to get an AI explanation in simple terms. You can also type questions directly in the chat.</p>
+                    <p><strong>💡 Tip:</strong> Click on any numbered section to get an AI explanation. You can also select text and ask questions directly in the chat.</p>
                 </div>
             </div>
+            <style>
+                .document-metadata {
+                    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+                    padding: 1rem;
+                    border-radius: 0.75rem;
+                    margin-bottom: 1.5rem;
+                    font-size: 0.875rem;
+                    border-left: 4px solid #2563eb;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                }
+                .metadata-title {
+                    font-weight: 600;
+                    color: #1f2937;
+                    margin-bottom: 0.5rem;
+                    font-size: 1rem;
+                }
+                .metadata-info, .metadata-file, .metadata-type {
+                    color: #1e40af;
+                    margin: 0.25rem 0;
+                }
+                .document-sections {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                }
+                .document-section {
+                    border: 1px solid #e5e7eb;
+                    border-radius: 0.5rem;
+                    transition: all 0.2s ease;
+                    cursor: pointer;
+                    position: relative;
+                    overflow: hidden;
+                }
+                .document-section:hover {
+                    border-color: #3b82f6;
+                    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+                    transform: translateY(-1px);
+                }
+                .heading-section {
+                    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+                }
+                .content-section {
+                    background: #ffffff;
+                }
+                .section-tooltip {
+                    position: absolute;
+                    top: -2rem;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #1f2937;
+                    color: white;
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 0.25rem;
+                    font-size: 0.75rem;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.2s ease;
+                    white-space: nowrap;
+                    z-index: 10;
+                }
+                .document-section:hover .section-tooltip {
+                    opacity: 1;
+                }
+                .section-content {
+                    display: flex;
+                    align-items: flex-start;
+                    padding: 1rem;
+                    gap: 0.75rem;
+                }
+                .section-number {
+                    flex-shrink: 0;
+                    width: 2.5rem;
+                    height: 2.5rem;
+                    background: #3b82f6;
+                    color: white;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 600;
+                    font-size: 0.875rem;
+                }
+                .heading-section .section-number {
+                    background: #059669;
+                }
+                .section-text {
+                    flex: 1;
+                    line-height: 1.6;
+                    color: #374151;
+                }
+                .tip-box {
+                    margin-top: 1.5rem;
+                    padding: 1rem;
+                    background: #f9fafb;
+                    border-radius: 0.5rem;
+                    border-left: 4px solid #10b981;
+                }
+                .tip-box p {
+                    margin: 0;
+                    color: #065f46;
+                    font-size: 0.875rem;
+                }
+            </style>
         `;
 
-        this.documentContentElement.querySelectorAll('.clause').forEach(clauseElement => {
-            clauseElement.addEventListener('click', (e) => {
-                const clauseId = e.currentTarget.dataset.clauseId;
-                const clause = this.document.find(c => c.id === clauseId);
-                if (clause) {
-                    this.handleClauseClick(clause);
+        // Add click handlers for sections
+        this.documentContentElement.querySelectorAll('.document-section').forEach(sectionElement => {
+            sectionElement.addEventListener('click', (e) => {
+                const sectionId = e.currentTarget.dataset.sectionId;
+                const section = this.document.find(s => s.id === sectionId);
+                if (section) {
+                    this.handleSectionClick(section);
                 }
             });
         });
     }
 
     renderReadDocument() {
-        if (!this.readDocumentContent || !this.extractedData?.text) {
-            this.readDocumentContent.innerHTML = '<p>No content available to display.</p>';
+        if (!this.readDocumentContent) {
+            console.error('Read document content element not found');
+            return;
+        }
+
+        if (!this.extractedData?.text) {
+            this.readDocumentContent.innerHTML = `
+                <div class="no-content-message">
+                    <div class="no-content-icon">📄</div>
+                    <h3>No Document Content</h3>
+                    <p>Please upload a document using the extension popup to view content here.</p>
+                </div>
+            `;
             return;
         }
         
-        // Add metadata header if available
+        // Enhanced metadata header
         let metadataHtml = '';
         if (this.extractedData.timestamp) {
             const date = new Date(this.extractedData.timestamp);
             metadataHtml = `
-                <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: #6b7280; border-left: 4px solid #059669;">
-                    <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">${this.escapeHtml(this.extractedData.title)}</div>
-                    <div>Extracted on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</div>
-                    ${this.extractedData.fileName ? `<div>File: ${this.escapeHtml(this.extractedData.fileName)}</div>` : ''}
+                <div class="read-metadata">
+                    <div class="read-metadata-title">${this.escapeHtml(this.extractedData.title)}</div>
+                    <div class="read-metadata-details">
+                        <span class="metadata-item">📅 Extracted: ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</span>
+                        ${this.extractedData.fileName ? `<span class="metadata-item">📁 File: ${this.escapeHtml(this.extractedData.fileName)}</span>` : ''}
+                        ${this.extractedData.fileType ? `<span class="metadata-item">🏷️ Type: ${this.escapeHtml(this.extractedData.fileType)}</span>` : ''}
+                        <span class="metadata-item">📊 Length: ${this.extractedData.text.length.toLocaleString()} characters</span>
+                    </div>
                 </div>
             `;
         }
         
-        // Use the formatting function to generate HTML from the raw text
+        // Use the enhanced formatting function to generate HTML from the raw text
         const formattedHtml = this._formatTextToHtml(this.extractedData.text);
 
-        // Set the innerHTML of the read mode container
+        // Set the innerHTML of the read mode container with enhanced styling
         this.readDocumentContent.innerHTML = `
             <div class="read-document-wrapper">
                 ${metadataHtml}
-                ${formattedHtml}
+                <div class="read-content-body">
+                    ${formattedHtml}
+                </div>
                 <div class="read-tip-box">
-                    <p><strong>💡 Reading Mode:</strong> Select any text in the document to get an AI explanation. Use Focus Mode for clause-by-clause reading.</p>
+                    <div class="tip-icon">💡</div>
+                    <div class="tip-content">
+                        <strong>Reading Mode Tips:</strong>
+                        <ul>
+                            <li>Select any text to get an AI explanation in chat mode</li>
+                            <li>Use Focus Mode for section-by-section reading</li>
+                            <li>Scroll through the document at your own pace</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
+            <style>
+                .no-content-message {
+                    text-align: center;
+                    padding: 3rem 1rem;
+                    color: #6b7280;
+                }
+                .no-content-icon {
+                    font-size: 3rem;
+                    margin-bottom: 1rem;
+                }
+                .read-metadata {
+                    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                    padding: 1.5rem;
+                    border-radius: 0.75rem;
+                    margin-bottom: 2rem;
+                    border-left: 4px solid #059669;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                }
+                .read-metadata-title {
+                    font-weight: 700;
+                    color: #1f2937;
+                    margin-bottom: 0.75rem;
+                    font-size: 1.25rem;
+                }
+                .read-metadata-details {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.75rem;
+                }
+                .metadata-item {
+                    background: rgba(255, 255, 255, 0.7);
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 1rem;
+                    font-size: 0.875rem;
+                    color: #065f46;
+                    border: 1px solid rgba(5, 150, 105, 0.2);
+                }
+                .read-content-body {
+                    background: #ffffff;
+                    padding: 2rem;
+                    border-radius: 0.75rem;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                    border: 1px solid #e5e7eb;
+                    margin-bottom: 2rem;
+                    max-width: none;
+                }
+                .read-tip-box {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 1rem;
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+                    border-radius: 0.75rem;
+                    border-left: 4px solid #f59e0b;
+                    margin-top: 2rem;
+                }
+                .tip-icon {
+                    font-size: 1.5rem;
+                    flex-shrink: 0;
+                }
+                .tip-content {
+                    color: #92400e;
+                    font-size: 0.875rem;
+                }
+                .tip-content strong {
+                    color: #78350f;
+                    display: block;
+                    margin-bottom: 0.5rem;
+                }
+                .tip-content ul {
+                    margin: 0;
+                    padding-left: 1.25rem;
+                }
+                .tip-content li {
+                    margin: 0.25rem 0;
+                }
+                .read-document-wrapper {
+                    max-width: 100%;
+                    margin: 0 auto;
+                }
+            </style>
         `;
     }
 
@@ -604,6 +1116,23 @@ class LegalChatApp {
         const question = `Explain this clause in simple terms: ${clause.text}`;
         this.messageInput.value = question;
         this.handleSendMessage();
+    }
+
+    handleSectionClick(section) {
+        // Switch to chat mode if not already there
+        if (this.viewMode !== 'chat') {
+            this.switchToMode('chat');
+        }
+        
+        // Create appropriate question based on section type
+        const sectionType = section.type === 'heading' ? 'heading' : 'section';
+        const question = `Explain this ${sectionType} in simple terms: "${section.text}"`;
+        
+        // Set the question in the input and send it
+        setTimeout(() => {
+            this.messageInput.value = question;
+            this.handleSendMessage();
+        }, 100); // Small delay to ensure chat mode is active
     }
 
     showDocumentError(message = 'Failed to load document. Please try refreshing.') {
@@ -621,20 +1150,7 @@ class LegalChatApp {
         if (this.focusClauseContent) this.focusClauseContent.innerHTML = errorHtml;
     }
 
-    showDocumentError() {
-        const errorHtml = `
-            <div class="clause">
-                <div class="clause-content">
-                    <div class="clause-number">!</div>
-                    <div class="clause-text">Failed to load document from API. Please try refreshing.</div>
-                </div>
-            </div>
-        `;
-        
-        if (this.documentContentElement) this.documentContentElement.innerHTML = errorHtml;
-        if (this.readDocumentContent) this.readDocumentContent.innerHTML = errorHtml;
-        if (this.focusClauseContent) this.focusClauseContent.innerHTML = errorHtml;
-    }
+
 
     escapeHtml(text) {
         const div = document.createElement('div');
@@ -645,5 +1161,5 @@ class LegalChatApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new LegalChatApp();
+    window.legalChatApp = new LegalChatApp();
 });

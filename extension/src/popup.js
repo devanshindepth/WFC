@@ -687,7 +687,7 @@ class TextExtractor {
         this.extractSelection();
     });
 
-    // Replace image/PDF upload with document upload
+    // Update to allow document and image upload
     document.getElementById("uploadDocument").addEventListener("click", () => {
         document.getElementById("documentFile").click();
     });
@@ -695,7 +695,7 @@ class TextExtractor {
     document.getElementById("documentFile").addEventListener("change", (e) => {
         this.handleDocumentUpload(e.target.files[0]);
     });
-}
+  }
 
   showStatus(message, type = "") {
     this.status.textContent = message;
@@ -798,16 +798,21 @@ class TextExtractor {
   async handleDocumentUpload(file) {
     if (!file) return;
 
-    // Validate file type before upload
+    // Validate file type before upload - add image types
     const allowedTypes = [
       'text/plain',
       'application/pdf', 
       'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml'
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      this.showStatus("❌ Unsupported file type. Please upload .txt, .pdf, .doc, or .docx files.", "error");
+      this.showStatus("❌ Unsupported file type. Please upload .txt, .pdf, .doc, .docx, or image files.", "error");
       return;
     }
 
@@ -898,11 +903,10 @@ class TextExtractor {
         console.error("Error uploading document:", error);
         this.showStatus(`❌ ${error.message}`, "error");
     }
-}
+  }
 
 
   
-
   async showFileViewer(fileData, fileType, title) {
     // Store the file data
     await chrome.storage.local.set({

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateText } from 'ai';
 import { google } from '@ai-sdk/google';
 
+// ... existing imports ...
+
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type') || '';
@@ -39,17 +41,22 @@ async function handleFileUpload(request: NextRequest) {
       );
     }
 
-    // Validate file type - support .txt, .pdf, .doc, .docx
+    // Validate file type - support .txt, .pdf, .doc, .docx, and images
     const allowedTypes = [
       'text/plain',
       'application/pdf',
       'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml'
     ];
     
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: "Unsupported file type. Please upload .txt, .pdf, .doc, or .docx files." },
+        { error: "Unsupported file type. Please upload .txt, .pdf, .doc, .docx, or image files." },
         { status: 400 }
       );
     }
@@ -74,13 +81,13 @@ async function handleFileUpload(request: NextRequest) {
       });
     }
 
-    // Convert file to base64 for binary files (PDF, DOC, DOCX)
+    // Convert file to base64 for binary files (PDF, DOC, DOCX, Images)
     const arrayBuffer = await file.arrayBuffer();
     const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
     // Simplified extraction prompt focused only on text extraction
     const extractionPrompt = `
-    Extract all text content from this document.
+    Extract all text content from this document or image.
 
     REQUIREMENTS:
     1. Extract all readable text content
@@ -143,4 +150,3 @@ async function handleFileUpload(request: NextRequest) {
     );
   }
 }
-
