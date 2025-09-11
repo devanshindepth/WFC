@@ -101,29 +101,45 @@ class LegalChatApp {
         // Ensure we are in a Chrome extension environment
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
             
-            // 1. Fetch all necessary data, including the timestamp
-            const data = await chrome.storage.local.get(['extractedText', 'extractedTitle', 'timestamp']);
+            // Fetch all necessary data, including additional metadata
+            const data = await chrome.storage.local.get([
+                'extractedText', 
+                'extractedTitle', 
+                'timestamp', 
+                'fileName', 
+                'fileType', 
+                'extractionTimestamp'
+            ]);
             
             if (data.extractedText) {
-                // 2. Set this.extractedData correctly for use in other functions (e.g., for showing the timestamp)
+                // Set this.extractedData with comprehensive metadata
                 this.extractedData = {
                     text: data.extractedText,
                     title: data.extractedTitle || 'Extracted Content',
-                    timestamp: data.timestamp
+                    timestamp: data.timestamp,
+                    fileName: data.fileName,
+                    fileType: data.fileType,
+                    extractionTimestamp: data.extractionTimestamp
                 };
                 
-                // 3. Create the object with the structure that displayProcessedContent expects
+                // Create the object with the structure that displayProcessedContent expects
                 const processedDocument = {
                     content: data.extractedText, 
                     title: data.extractedTitle || 'Extracted Content'
                 };
                 
-                // 4. Set the title and display the content
+                // Set the title and display the content
                 this.setDocumentTitle(processedDocument.title);
                 this.displayProcessedContent(processedDocument);
 
+                console.log('Successfully loaded extracted document:', {
+                    title: this.extractedData.title,
+                    textLength: this.extractedData.text.length,
+                    timestamp: new Date(this.extractedData.timestamp).toLocaleString()
+                });
+
             } else {
-                // If no extracted text is found in storage, load the default document
+                // If no extracted text is found in storage, show appropriate message
                 this.loadDocument();
             }
         } else {
@@ -132,8 +148,8 @@ class LegalChatApp {
         }
     } catch (error) {
         console.error('Error loading extracted content:', error);
-        // If there's an error, load the default document as a fallback
-        this.loadDocument();
+        // If there's an error, show error message and load fallback
+        this.showDocumentError('Error loading document content. Please try uploading again.');
     }
 }
 
@@ -201,32 +217,28 @@ class LegalChatApp {
     }
 
     displayProcessedContent(processedDocument) {
-        if (!processedDocument) return;
-
-        // Add timestamp info if available
-        let contentHtml = '';
-        if (this.extractedData.timestamp) {
-            const date = new Date(this.extractedData.timestamp);
-            contentHtml += `
-                <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: #6b7280;">
-                    <strong>${this.extractedData.title}</strong><br>
-                    Extracted on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}
-                </div>
-            `;
+        if (!processedDocument) {
+            this.showDocumentError('No document content available to display.');
+            return;
         }
 
         // Parse the processed content into clauses for document structure
         if (processedDocument.content) {
             const paragraphs = processedDocument.content.split('\n\n').filter(p => p.trim());
             
-            // Update document array for consistency
+            // Update document array for consistency with better structure
             this.document = paragraphs.map((paragraph, index) => ({
                 id: `clause-${index}`,
                 text: paragraph.trim(),
                 index: index + 1
             }));
             
+            // Render all document views with the extracted content
             this.renderAllDocumentViews();
+            
+            console.log(`Document processed: ${this.document.length} sections found`);
+        } else {
+            this.showDocumentError('Document content is empty or could not be processed.');
         }
     }
 
@@ -510,6 +522,19 @@ class LegalChatApp {
     renderChatDocument() {
         if (!this.documentContentElement) return;
         
+        // Add metadata header if available
+        let metadataHtml = '';
+        if (this.extractedData?.timestamp) {
+            const date = new Date(this.extractedData.timestamp);
+            metadataHtml = `
+                <div style="background: #eff6ff; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: #1e40af; border-left: 4px solid #2563eb;">
+                    <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">${this.escapeHtml(this.extractedData.title)}</div>
+                    <div>Extracted on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</div>
+                    ${this.extractedData.fileName ? `<div>File: ${this.escapeHtml(this.extractedData.fileName)}</div>` : ''}
+                </div>
+            `;
+        }
+        
         const clausesHtml = this.document.map(clause => `
             <div class="clause" data-clause-id="${clause.id}">
                 <div class="clause-tooltip">Click to explain</div>
@@ -522,6 +547,7 @@ class LegalChatApp {
 
         this.documentContentElement.innerHTML = `
             <div>
+                ${metadataHtml}
                 ${clausesHtml}
                 <div class="tip-box">
                     <p><strong>💡 Tip:</strong> Click on any numbered clause to get an AI explanation in simple terms. You can also type questions directly in the chat.</p>
@@ -546,12 +572,26 @@ class LegalChatApp {
             return;
         }
         
-        // Use the new formatting function to generate HTML from the raw text
+        // Add metadata header if available
+        let metadataHtml = '';
+        if (this.extractedData.timestamp) {
+            const date = new Date(this.extractedData.timestamp);
+            metadataHtml = `
+                <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: #6b7280; border-left: 4px solid #059669;">
+                    <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">${this.escapeHtml(this.extractedData.title)}</div>
+                    <div>Extracted on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</div>
+                    ${this.extractedData.fileName ? `<div>File: ${this.escapeHtml(this.extractedData.fileName)}</div>` : ''}
+                </div>
+            `;
+        }
+        
+        // Use the formatting function to generate HTML from the raw text
         const formattedHtml = this._formatTextToHtml(this.extractedData.text);
 
         // Set the innerHTML of the read mode container
         this.readDocumentContent.innerHTML = `
             <div class="read-document-wrapper">
+                ${metadataHtml}
                 ${formattedHtml}
                 <div class="read-tip-box">
                     <p><strong>💡 Reading Mode:</strong> Select any text in the document to get an AI explanation. Use Focus Mode for clause-by-clause reading.</p>

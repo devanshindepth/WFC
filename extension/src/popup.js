@@ -798,19 +798,39 @@ class TextExtractor {
   async handleDocumentUpload(file) {
     if (!file) return;
 
-    this.showStatus("Uploading document...", "loading");
+    // Validate file type before upload
+    const allowedTypes = [
+      'text/plain',
+      'application/pdf', 
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      this.showStatus("❌ Unsupported file type. Please upload .txt, .pdf, .doc, or .docx files.", "error");
+      return;
+    }
+
+    // Check file size (20MB limit)
+    if (file.size > 20 * 1024 * 1024) {
+      this.showStatus("❌ File too large. Maximum size is 20MB.", "error");
+      return;
+    }
+
+    this.showStatus("Processing document...", "loading");
 
     try {
         const formData = new FormData();
         formData.append('document', file);
 
-        const response = await fetch('http://localhost:3000/api/ai/document', {
+        const response = await fetch('http://localhost:3000/api/ai/extraction', {
             method: 'POST',
             body: formData
         });
 
         if (!response.ok) {
-            throw new Error(`Upload failed: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Upload failed: ${response.status}`);
         }
 
         const result = await response.json();
@@ -819,24 +839,61 @@ class TextExtractor {
             throw new Error(result.error || "Failed to process document");
         }
 
-        // Store the processed content
-        await chrome.storage.local.set({
-            extractedText: result.content,
-            extractedTitle: result.title || `Uploaded: ${file.name}`,
+        // Store the extracted content and metadata properly in chrome.storage.local
+        const extractionData = {
+            extractedText: result.extractedText,
+            extractedTitle: `Uploaded: ${result.fileName}`,
             timestamp: Date.now(),
-        });
+            fileName: result.fileName,
+            fileType: result.fileType || file.type,
+            extractionTimestamp: result.timestamp
+        };
 
-        // Open the viewer
-        chrome.windows.create({
-            url: chrome.runtime.getURL("viewer.html"),
-            type: "popup",
-            width: 800,
-            height: 600,
-            left: 100,
-            top: 100,
-        });
+        await chrome.storage.local.set(extractionData);
 
-        this.showStatus("✅ Document processed!", "success");
+        this.showStatus("✅ Document processed! Opening viewer...", "success");
+
+        // Automatically open viewer window with proper positioning and sizing
+        try {
+            const viewerWindow = await chrome.windows.create({
+                url: chrome.runtime.getURL("viewer.html"),
+                type: "popup",
+                width: 1000,
+                height: 700,
+                left: Math.max(0, Math.round((screen.width - 1000) / 2)),
+                top: Math.max(0, Math.round((screen.height - 700) / 2)),
+                focused: true
+            });
+
+            // Verify viewer window opened successfully
+            if (viewerWindow && viewerWindow.id) {
+                console.log(`Viewer window opened successfully with ID: ${viewerWindow.id}`);
+                
+                // Update status to show successful completion
+                setTimeout(() => {
+                    this.showStatus("✅ Document ready in viewer!", "success");
+                }, 500);
+            } else {
+                throw new Error("Failed to create viewer window");
+            }
+
+        } catch (viewerError) {
+            console.error("Error opening viewer window:", viewerError);
+            this.showStatus("⚠️ Document processed, but viewer failed to open. Please click the extension icon to view.", "error");
+            
+            // Fallback: try to open in a new tab if popup fails
+            try {
+                await chrome.tabs.create({
+                    url: chrome.runtime.getURL("viewer.html"),
+                    active: true
+                });
+                this.showStatus("✅ Document opened in new tab!", "success");
+            } catch (tabError) {
+                console.error("Error opening viewer tab:", tabError);
+                this.showStatus("❌ Could not open viewer. Document is saved - try refreshing the extension.", "error");
+            }
+        }
+
     } catch (error) {
         console.error("Error uploading document:", error);
         this.showStatus(`❌ ${error.message}`, "error");
