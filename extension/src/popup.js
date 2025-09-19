@@ -105,8 +105,12 @@ class TermsPopup {
       this.refreshDetection();
     });
 
-    document.getElementById("openTermsBtn").addEventListener("click", () => {
-      this.openFirstTermsLink();
+    document.getElementById("openChatBtn").addEventListener("click", () => {
+      this.openChatInterface();
+    });
+
+    document.getElementById("analyzeSeverityBtn").addEventListener("click", () => {
+      this.analyzeSeverity();
     });
   }
 
@@ -118,9 +122,25 @@ class TermsPopup {
     return tab;
   }
 
-  async analyzeTermsSeverity(termsText) {
+  async analyzeSeverity() {
+    if (!this.currentData || (!this.currentData.termsLinks.length && !this.currentData.acceptanceElements.length)) {
+      this.showSeverityError("No terms detected to analyze");
+      return;
+    }
+
+    this.showSeverityLoading(true);
+
     try {
-      const response = await fetch("http://localhost:3000/api/chat", {
+      // Prepare data for analysis
+      const analysisData = {
+        termsLinks: this.currentData.termsLinks,
+        acceptanceElements: this.currentData.acceptanceElements,
+        termsContent: this.currentData.termsContent,
+        url: window.location.href,
+        timestamp: this.currentData.timestamp
+      };
+
+      const response = await fetch("http://localhost:3000/api/ai/summary", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -129,23 +149,29 @@ class TermsPopup {
           messages: [
             {
               role: "user",
-              content: termsText,
+              content: JSON.stringify(analysisData, null, 2),
             },
           ],
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Network response was not ok");
+        throw new Error(`Server error: ${response.status}`);
       }
 
       const data = await response.json();
-      // Extract the severity text from the response
-      const severityText = data.choices[0].message.content.trim();
-      return severityText;
+      const severityText = data.choices[0]?.message?.content?.trim();
+      
+      if (severityText) {
+        this.displaySeverityResult(severityText);
+      } else {
+        this.showSeverityError("No severity analysis received");
+      }
     } catch (error) {
-      console.error("Error analyzing terms severity:", error);
-      return null;
+      console.error("Error analyzing severity:", error);
+      this.showSeverityError("Failed to analyze terms severity. Please try again.");
+    } finally {
+      this.showSeverityLoading(false);
     }
   }
 
@@ -239,46 +265,7 @@ class TermsPopup {
     }
   }
 
-  async sendTermsToBackend(data) {
-    try {
-      // We will serialize the detected data to send it for analysis.
-      const contentToAnalyze = JSON.stringify(data, null, 2);
 
-      const response = await fetch("http://localhost:3000/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // FIX: The body is now structured correctly for the backend API.
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "user",
-              content: contentToAnalyze,
-            },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      // The backend returns the full API response from OpenRouter.
-      // We need to extract the content from the first choice.
-      const severityText = result.choices[0]?.message?.content.trim();
-      return severityText || null;
-
-    } catch (error) {
-      console.error("Error sending data to backend:", error);
-      this.showStatus(
-        "Could not connect to severity analysis service",
-        "error"
-      );
-      return null;
-    }
-  }
 
   async refreshDetection() {
     this.showLoading();
@@ -465,27 +452,82 @@ class TermsPopup {
     document.getElementById("emptyState").style.display = "block";
   }
 
-  showSeverityAlert(severity) {
-    // You can customize this alert as needed
-    const alertMessage = `Terms Severity: ${severity.toUpperCase()}\n\n`;
+  showSeverityLoading(show) {
+    const loadingElement = document.querySelector(".severity-loading");
+    const resultElement = document.getElementById("severityResult");
+    
+    if (show) {
+      loadingElement.style.display = "block";
+      resultElement.style.display = "none";
+    } else {
+      loadingElement.style.display = "none";
+      resultElement.style.display = "block";
+    }
+  }
 
-    switch (severity) {
+  showSeverityError(message) {
+    const resultElement = document.getElementById("severityResult");
+    resultElement.innerHTML = `
+      <div style="color: #dc2626; font-size: 12px; padding: 10px; background: #fee2e2; border-radius: 4px;">
+        ⚠️ ${message}
+      </div>
+    `;
+    this.showSeverityLoading(false);
+  }
+
+  displaySeverityResult(severityText) {
+    const resultElement = document.getElementById("severityResult");
+    
+    // Parse severity levels from the response
+    const severities = severityText.split(",").map(s => s.trim().toLowerCase());
+    const uniqueSeverities = [...new Set(severities)];
+    
+    // Count occurrences
+    const severityCounts = {
+      high: severities.filter(s => s === "high").length,
+      medium: severities.filter(s => s === "medium").length,
+      low: severities.filter(s => s === "low").length
+    };
+
+    // Determine overall severity
+    let overallSeverity = "low";
+    if (severityCounts.high > 0) {
+      overallSeverity = "high";
+    } else if (severityCounts.medium > 0) {
+      overallSeverity = "medium";
+    }
+
+    // Create severity badges
+    const badges = uniqueSeverities.map(severity => {
+      const count = severityCounts[severity];
+      if (count > 0) {
+        return `<span class="severity-badge severity-${severity}">${severity} (${count})</span>`;
+      }
+      return '';
+    }).filter(badge => badge).join('');
+
+    // Create summary message
+    let summaryMessage = "";
+    switch (overallSeverity) {
       case "high":
-        alert(
-          alertMessage + "Warning: These terms may contain concerning clauses."
-        );
+        summaryMessage = "⚠️ High risk detected. Review these terms carefully before accepting.";
         break;
       case "medium":
-        alert(
-          alertMessage + "Note: Review these terms carefully before accepting."
-        );
+        summaryMessage = "⚡ Medium risk detected. Consider reviewing the highlighted clauses.";
         break;
       case "low":
-        alert(alertMessage + "These terms appear to be standard.");
+        summaryMessage = "✅ Low risk detected. These terms appear to be standard.";
         break;
-      default:
-        alert(alertMessage + "Severity assessment completed.");
     }
+
+    resultElement.innerHTML = `
+      <div class="severity-badges" style="margin-bottom: 10px;">
+        ${badges}
+      </div>
+      <div class="severity-summary">
+        ${summaryMessage}
+      </div>
+    `;
   }
 
   displayResults() {
@@ -507,25 +549,7 @@ class TermsPopup {
       acceptanceElements.length
     );
 
-    if (termsContent && !termsContent.error && termsContent.summary) {
-      this.analyzeTermsSeverity(termsContent.summary)
-        .then((severity) => {
-          if (severity) {
-            this.showSeverityAlert(severity);
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to analyze severity:", error);
-        });
-    }
-    // Send data to backend if terms detected
-    if (hasTermsAndAcceptance || termsLinks.length > 0) {
-      this.sendTermsToBackend(this.currentData).then((severity) => {
-        if (severity) {
-          this.showSeverityAlert(severity);
-        }
-      });
-    }
+
 
     // Display terms links
     if (termsLinks.length > 0) {
@@ -537,16 +561,15 @@ class TermsPopup {
       this.displayAcceptanceElements(acceptanceElements);
     }
 
-    // Display terms content
-    if (termsContent) {
-      this.displayTermsContent(termsContent);
+    // Show severity analysis section if terms are detected
+    if (hasTermsAndAcceptance || termsLinks.length > 0) {
+      this.showSeveritySection();
     }
 
-    // Show/hide open terms button
-    const openBtn = document.getElementById("openTermsBtn");
-    if (termsLinks.length > 0) {
+    // Show/hide open chat button
+    const openBtn = document.getElementById("openChatBtn");
+    if (hasTermsAndAcceptance || termsLinks.length > 0) {
       openBtn.style.display = "block";
-      openBtn.setAttribute("data-url", termsLinks[0].href);
     } else {
       openBtn.style.display = "none";
     }
@@ -620,30 +643,18 @@ class TermsPopup {
       .join("");
   }
 
-  displayTermsContent(termsContent) {
-    const section = document.getElementById("contentSection");
-    const textContainer = document.getElementById("termsText");
-    const urlContainer = document.getElementById("contentUrl");
-
+  showSeveritySection() {
+    const section = document.getElementById("severitySection");
+    const resultElement = document.getElementById("severityResult");
+    
     section.style.display = "block";
-
-    if (termsContent.error) {
-      textContainer.textContent = `Error: ${termsContent.error}`;
-      textContainer.style.color = "#dc3545";
-    } else {
-      textContainer.textContent = termsContent.summary;
-      textContainer.style.color = "#333";
-
-      if (termsContent.fullLength) {
-        const info = document.createElement("div");
-        info.className = "info-text";
-        info.style.marginTop = "10px";
-        info.textContent = `Showing preview of ${termsContent.fullLength.toLocaleString()} characters`;
-        textContainer.appendChild(info);
-      }
-    }
-
-    urlContainer.textContent = `Source: ${termsContent.url}`;
+    
+    // Reset the result area
+    resultElement.innerHTML = `
+      <div style="color: #6b7280; font-size: 12px; text-align: center; padding: 20px;">
+        Click "Analyze Terms Severity" to get AI-powered risk assessment
+      </div>
+    `;
   }
 
   truncateText(text, maxLength) {
@@ -653,11 +664,159 @@ class TermsPopup {
       : text;
   }
 
-  async openFirstTermsLink() {
-    if (this.currentData && this.currentData.termsLinks.length > 0) {
-      const url = this.currentData.termsLinks[0].href;
-      await chrome.tabs.create({ url });
+  async openChatInterface() {
+    if (!this.currentData) {
+      console.error("No terms data available to open chat");
+      return;
     }
+
+    try {
+      // Get current tab info for better context
+      const tab = await this.getCurrentTab();
+      
+      // Format the terms data for the chat interface
+      const formattedTermsData = await this.formatTermsForChat(this.currentData, tab);
+      
+      // Store the formatted terms data in chrome storage for the viewer to access
+      await chrome.storage.local.set({
+        extractedText: formattedTermsData.text,
+        extractedTitle: formattedTermsData.title,
+        timestamp: Date.now(),
+        fileName: "Terms & Conditions Analysis",
+        fileType: "text/plain",
+        extractionTimestamp: this.currentData.timestamp,
+        sourceUrl: tab?.url || 'Unknown'
+      });
+
+      // Open the viewer window (chat interface)
+      const viewerWindow = await chrome.windows.create({
+        url: chrome.runtime.getURL("viewer.html"),
+        type: "popup",
+        width: 1000,
+        height: 700,
+        left: Math.max(0, Math.round((screen.width - 1000) / 2)),
+        top: Math.max(0, Math.round((screen.height - 700) / 2)),
+        focused: true
+      });
+
+      if (viewerWindow && viewerWindow.id) {
+        console.log(`Chat interface opened successfully with ID: ${viewerWindow.id}`);
+      } else {
+        throw new Error("Failed to create chat interface window");
+      }
+
+    } catch (error) {
+      console.error("Error opening chat interface:", error);
+      
+      // Fallback: try to open in a new tab
+      try {
+        await chrome.tabs.create({
+          url: chrome.runtime.getURL("viewer.html"),
+          active: true
+        });
+        console.log("Chat interface opened in new tab as fallback");
+      } catch (tabError) {
+        console.error("Error opening chat interface tab:", tabError);
+        alert("Could not open chat interface. Please try refreshing the extension.");
+      }
+    }
+  }
+
+  formatTermsForChat(data, tab = null) {
+    const { termsLinks, acceptanceElements, termsContent } = data;
+    
+    let formattedText = "# Terms & Conditions Analysis\n\n";
+    
+    // Add current page info
+    let hostname = 'Current webpage';
+    if (tab && tab.url) {
+      try {
+        const url = new URL(tab.url);
+        hostname = url.hostname;
+      } catch (e) {
+        hostname = 'Current webpage';
+      }
+    }
+    
+    formattedText += `**Analyzed Page:** ${hostname}\n`;
+    formattedText += `**Analysis Time:** ${new Date(data.timestamp).toLocaleString()}\n\n`;
+    
+    formattedText += "---\n\n";
+    
+    // Add detection summary with emojis for better readability
+    formattedText += "## 📊 Detection Summary\n\n";
+    formattedText += `🔗 **Terms Links Found:** ${termsLinks.length}\n`;
+    formattedText += `✅ **Acceptance Elements Found:** ${acceptanceElements.length}\n`;
+    formattedText += `⚠️ **Risk Level:** ${data.hasTermsAndAcceptance ? 'High - Terms require acceptance' : 'Medium - Terms detected'}\n\n`;
+    
+    // Add terms links section with better formatting
+    if (termsLinks.length > 0) {
+      formattedText += "## 📄 Terms & Policy Links\n\n";
+      termsLinks.forEach((link, index) => {
+        formattedText += `### ${index + 1}. ${link.text}\n`;
+        formattedText += `**URL:** [${link.href}](${link.href})\n\n`;
+      });
+    }
+    
+    // Add acceptance elements section with better categorization
+    if (acceptanceElements.length > 0) {
+      formattedText += "## ✍️ Acceptance Elements\n\n";
+      
+      // Group by type for better organization
+      const groupedElements = acceptanceElements.reduce((groups, element) => {
+        const key = element.type.toUpperCase();
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(element);
+        return groups;
+      }, {});
+      
+      Object.entries(groupedElements).forEach(([type, elements]) => {
+        formattedText += `### ${type} Elements (${elements.length})\n\n`;
+        elements.forEach((element, index) => {
+          formattedText += `${index + 1}. `;
+          if (element.inputType) {
+            formattedText += `**${element.inputType}** - `;
+          }
+          formattedText += `"${element.text}"\n`;
+        });
+        formattedText += "\n";
+      });
+    }
+    
+    // Add terms content if available with better structure
+    if (termsContent && !termsContent.error && termsContent.summary) {
+      formattedText += "## 📖 Terms Content Preview\n\n";
+      
+      // Split content into paragraphs for better readability
+      const paragraphs = termsContent.summary.split('\n\n').filter(p => p.trim());
+      paragraphs.forEach((paragraph, index) => {
+        if (paragraph.trim()) {
+          formattedText += `${paragraph.trim()}\n\n`;
+        }
+      });
+      
+      if (termsContent.url) {
+        formattedText += `**📍 Source:** [${termsContent.url}](${termsContent.url})\n\n`;
+      }
+      if (termsContent.fullLength) {
+        formattedText += `*📏 Note: This is a preview of ${termsContent.fullLength.toLocaleString()} total characters*\n\n`;
+      }
+    }
+    
+    // Add separator
+    formattedText += "---\n\n";
+    
+    // Add helpful context for the AI
+    formattedText += "## 🤖 AI Analysis Context\n\n";
+    formattedText += "This document contains terms and conditions data extracted from a webpage. ";
+    formattedText += "The user may ask questions about privacy policies, user agreements, data collection, ";
+    formattedText += "cancellation policies, liability clauses, or other legal aspects. ";
+    formattedText += "Please provide clear, helpful analysis focusing on user rights and potential risks.\n\n";
+    
+    return {
+      text: formattedText,
+      title: "Terms & Conditions Analysis"
+    };
   }
 }
 // Popup script for Text Extractor Pro

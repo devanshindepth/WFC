@@ -18,12 +18,9 @@ export default {
   output: {
     dir: "dist",
     format: "esm",
-    chunkFileNames: path.join("chunks", "[name]-[hash].js"),
+    chunkFileNames: "chunks/[name]-[hash].js",
   },
-  compilerOptions: {
-    baseUrl: "./",
-  },
-  context: "this",
+  context: "globalThis",
   plugins: [
     replace({
       "process.env.NODE_ENV": isProduction
@@ -37,6 +34,7 @@ export default {
     resolve({
       browser: true,
       preferBuiltins: false,
+      exportConditions: ['browser'],
     }),
     commonjs({
       preferBuiltins: false,

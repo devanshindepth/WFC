@@ -117,19 +117,62 @@
             margin-right: 8px;
         }
 
-        .terms-content {
-            background: #f1f8e9;
+        .severity-content {
+            background: #f8f9fa;
             border-radius: 6px;
             padding: 12px;
-            max-height: 200px;
-            overflow-y: auto;
         }
 
-        .terms-text {
-            font-size: 12px;
+        .severity-analysis {
+            min-height: 60px;
+        }
+
+        .severity-loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .severity-result {
+            font-size: 13px;
             line-height: 1.4;
             color: #333;
-            white-space: pre-wrap;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin: 2px;
+        }
+
+        .severity-high {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .severity-medium {
+            background: #fef3c7;
+            color: #d97706;
+            border: 1px solid #fed7aa;
+        }
+
+        .severity-low {
+            background: #dcfce7;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+
+        .severity-summary {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-size: 12px;
         }
 
         .loading {
@@ -377,22 +420,30 @@
                 <div id="acceptanceElements" class="acceptance-elements"></div>
             </div>
             
-            <div id="contentSection" class="section" style="display: none;">
+            <div id="severitySection" class="section" style="display: none;">
                 <h3>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M13,9H18.5L13,3.5V9M6,2H14L20,8V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V4C4,2.89 4.89,2 6,2M15,18V16H6V18H15M18,14V12H6V14H18Z"/>
+                        <path d="M12,2L13.09,8.26L22,9L13.09,9.74L12,16L10.91,9.74L2,9L10.91,8.26L12,2Z"/>
                     </svg>
-                    Terms Content Preview
+                    Terms Severity Analysis
                 </h3>
-                <div id="termsContent" class="terms-content">
-                    <div id="termsText" class="terms-text"></div>
-                    <div id="contentUrl" class="url-info"></div>
+                <div id="severityContent" class="severity-content">
+                    <div id="severityAnalysis" class="severity-analysis">
+                        <div class="severity-loading" style="display: none;">
+                            <div class="spinner"></div>
+                            <div>Analyzing terms severity...</div>
+                        </div>
+                        <div id="severityResult" class="severity-result"></div>
+                    </div>
+                    <button id="analyzeSeverityBtn" class="btn btn-primary" style="margin-top: 10px;">
+                        Analyze Terms Severity
+                    </button>
                 </div>
             </div>
             
             <div class="actions">
                 <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
-                <button id="openTermsBtn" class="btn btn-primary" style="display: none;">Open Terms</button>
+                <button id="openChatBtn" class="btn btn-primary" style="display: none;">Open Chat</button>
             </div>
         </div>
         
