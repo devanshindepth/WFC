@@ -109,9 +109,11 @@ class TermsPopup {
       this.openChatInterface();
     });
 
-    document.getElementById("analyzeSeverityBtn").addEventListener("click", () => {
-      this.analyzeSeverity();
-    });
+    document
+      .getElementById("analyzeSeverityBtn")
+      .addEventListener("click", () => {
+        this.analyzeSeverity();
+      });
   }
 
   async getCurrentTab() {
@@ -123,7 +125,11 @@ class TermsPopup {
   }
 
   async analyzeSeverity() {
-    if (!this.currentData || (!this.currentData.termsLinks.length && !this.currentData.acceptanceElements.length)) {
+    if (
+      !this.currentData ||
+      (!this.currentData.termsLinks.length &&
+        !this.currentData.acceptanceElements.length)
+    ) {
       this.showSeverityError("No terms detected to analyze");
       return;
     }
@@ -137,7 +143,7 @@ class TermsPopup {
         acceptanceElements: this.currentData.acceptanceElements,
         termsContent: this.currentData.termsContent,
         url: window.location.href,
-        timestamp: this.currentData.timestamp
+        timestamp: this.currentData.timestamp,
       };
 
       const response = await fetch("http://localhost:3000/api/ai/summary", {
@@ -161,7 +167,7 @@ class TermsPopup {
 
       const data = await response.json();
       const severityText = data.choices[0]?.message?.content?.trim();
-      
+
       if (severityText) {
         this.displaySeverityResult(severityText);
       } else {
@@ -169,7 +175,9 @@ class TermsPopup {
       }
     } catch (error) {
       console.error("Error analyzing severity:", error);
-      this.showSeverityError("Failed to analyze terms severity. Please try again.");
+      this.showSeverityError(
+        "Failed to analyze terms severity. Please try again."
+      );
     } finally {
       this.showSeverityLoading(false);
     }
@@ -264,8 +272,6 @@ class TermsPopup {
       this.showEmptyState();
     }
   }
-
-
 
   async refreshDetection() {
     this.showLoading();
@@ -455,7 +461,7 @@ class TermsPopup {
   showSeverityLoading(show) {
     const loadingElement = document.querySelector(".severity-loading");
     const resultElement = document.getElementById("severityResult");
-    
+
     if (show) {
       loadingElement.style.display = "block";
       resultElement.style.display = "none";
@@ -477,16 +483,18 @@ class TermsPopup {
 
   displaySeverityResult(severityText) {
     const resultElement = document.getElementById("severityResult");
-    
+
     // Parse severity levels from the response
-    const severities = severityText.split(",").map(s => s.trim().toLowerCase());
+    const severities = severityText
+      .split(",")
+      .map((s) => s.trim().toLowerCase());
     const uniqueSeverities = [...new Set(severities)];
-    
+
     // Count occurrences
     const severityCounts = {
-      high: severities.filter(s => s === "high").length,
-      medium: severities.filter(s => s === "medium").length,
-      low: severities.filter(s => s === "low").length
+      high: severities.filter((s) => s === "high").length,
+      medium: severities.filter((s) => s === "medium").length,
+      low: severities.filter((s) => s === "low").length,
     };
 
     // Determine overall severity
@@ -498,25 +506,31 @@ class TermsPopup {
     }
 
     // Create severity badges
-    const badges = uniqueSeverities.map(severity => {
-      const count = severityCounts[severity];
-      if (count > 0) {
-        return `<span class="severity-badge severity-${severity}">${severity} (${count})</span>`;
-      }
-      return '';
-    }).filter(badge => badge).join('');
+    const badges = uniqueSeverities
+      .map((severity) => {
+        const count = severityCounts[severity];
+        if (count > 0) {
+          return `<span class="severity-badge severity-${severity}">${severity} (${count})</span>`;
+        }
+        return "";
+      })
+      .filter((badge) => badge)
+      .join("");
 
     // Create summary message
     let summaryMessage = "";
     switch (overallSeverity) {
       case "high":
-        summaryMessage = "⚠️ High risk detected. Review these terms carefully before accepting.";
+        summaryMessage =
+          "⚠️ High risk detected. Review these terms carefully before accepting.";
         break;
       case "medium":
-        summaryMessage = "⚡ Medium risk detected. Consider reviewing the highlighted clauses.";
+        summaryMessage =
+          "⚡ Medium risk detected. Consider reviewing the highlighted clauses.";
         break;
       case "low":
-        summaryMessage = "✅ Low risk detected. These terms appear to be standard.";
+        summaryMessage =
+          "✅ Low risk detected. These terms appear to be standard.";
         break;
     }
 
@@ -548,8 +562,6 @@ class TermsPopup {
       termsLinks.length,
       acceptanceElements.length
     );
-
-
 
     // Display terms links
     if (termsLinks.length > 0) {
@@ -646,9 +658,9 @@ class TermsPopup {
   showSeveritySection() {
     const section = document.getElementById("severitySection");
     const resultElement = document.getElementById("severityResult");
-    
+
     section.style.display = "block";
-    
+
     // Reset the result area
     resultElement.innerHTML = `
       <div style="color: #6b7280; font-size: 12px; text-align: center; padding: 20px;">
@@ -664,6 +676,34 @@ class TermsPopup {
       : text;
   }
 
+  async fetchFullTermsContent() {
+    const { termsLinks } = this.currentData;
+    const fullContent = [];
+
+    for (const link of termsLinks) {
+      try {
+        // Fetch the actual terms page content
+        const response = await fetch(link.href);
+        const html = await response.text();
+
+        // Extract text from HTML (you'll need to parse this)
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const textContent = doc.body.innerText || doc.body.textContent;
+
+        fullContent.push({
+          title: link.text,
+          url: link.href,
+          content: textContent,
+        });
+      } catch (error) {
+        console.error(`Failed to fetch content from ${link.href}:`, error);
+      }
+    }
+
+    return fullContent;
+  }
+
   async openChatInterface() {
     if (!this.currentData) {
       console.error("No terms data available to open chat");
@@ -673,10 +713,17 @@ class TermsPopup {
     try {
       // Get current tab info for better context
       const tab = await this.getCurrentTab();
-      
-      // Format the terms data for the chat interface
-      const formattedTermsData = await this.formatTermsForChat(this.currentData, tab);
-      
+
+      const fullTermsContent = await this.fetchFullTermsContent();
+
+      const formattedTermsData = await this.formatTermsForChat(
+        {
+          ...this.currentData,
+          fullTermsContent: fullTermsContent,
+        },
+        tab
+      );
+
       // Store the formatted terms data in chrome storage for the viewer to access
       await chrome.storage.local.set({
         extractedText: formattedTermsData.text,
@@ -685,7 +732,7 @@ class TermsPopup {
         fileName: "Terms & Conditions Analysis",
         fileType: "text/plain",
         extractionTimestamp: this.currentData.timestamp,
-        sourceUrl: tab?.url || 'Unknown'
+        sourceUrl: tab?.url || "Unknown",
       });
 
       // Open the viewer window (chat interface)
@@ -696,59 +743,69 @@ class TermsPopup {
         height: 700,
         left: Math.max(0, Math.round((screen.width - 1000) / 2)),
         top: Math.max(0, Math.round((screen.height - 700) / 2)),
-        focused: true
+        focused: true,
       });
 
       if (viewerWindow && viewerWindow.id) {
-        console.log(`Chat interface opened successfully with ID: ${viewerWindow.id}`);
+        console.log(
+          `Chat interface opened successfully with ID: ${viewerWindow.id}`
+        );
       } else {
         throw new Error("Failed to create chat interface window");
       }
-
     } catch (error) {
       console.error("Error opening chat interface:", error);
-      
+
       // Fallback: try to open in a new tab
       try {
         await chrome.tabs.create({
           url: chrome.runtime.getURL("viewer.html"),
-          active: true
+          active: true,
         });
         console.log("Chat interface opened in new tab as fallback");
       } catch (tabError) {
         console.error("Error opening chat interface tab:", tabError);
-        alert("Could not open chat interface. Please try refreshing the extension.");
+        alert(
+          "Could not open chat interface. Please try refreshing the extension."
+        );
       }
     }
   }
 
   formatTermsForChat(data, tab = null) {
-    const { termsLinks, acceptanceElements, termsContent } = data;
-    
+    const { termsLinks, acceptanceElements, termsContent, fullTermsContent } =
+      data;
+
     let formattedText = "# Terms & Conditions Analysis\n\n";
-    
+
     // Add current page info
-    let hostname = 'Current webpage';
+    let hostname = "Current webpage";
     if (tab && tab.url) {
       try {
         const url = new URL(tab.url);
         hostname = url.hostname;
       } catch (e) {
-        hostname = 'Current webpage';
+        hostname = "Current webpage";
       }
     }
-    
+
     formattedText += `**Analyzed Page:** ${hostname}\n`;
-    formattedText += `**Analysis Time:** ${new Date(data.timestamp).toLocaleString()}\n\n`;
-    
+    formattedText += `**Analysis Time:** ${new Date(
+      data.timestamp
+    ).toLocaleString()}\n\n`;
+
     formattedText += "---\n\n";
-    
+
     // Add detection summary with emojis for better readability
     formattedText += "## 📊 Detection Summary\n\n";
     formattedText += `🔗 **Terms Links Found:** ${termsLinks.length}\n`;
     formattedText += `✅ **Acceptance Elements Found:** ${acceptanceElements.length}\n`;
-    formattedText += `⚠️ **Risk Level:** ${data.hasTermsAndAcceptance ? 'High - Terms require acceptance' : 'Medium - Terms detected'}\n\n`;
-    
+    formattedText += `⚠️ **Risk Level:** ${
+      data.hasTermsAndAcceptance
+        ? "High - Terms require acceptance"
+        : "Medium - Terms detected"
+    }\n\n`;
+
     // Add terms links section with better formatting
     if (termsLinks.length > 0) {
       formattedText += "## 📄 Terms & Policy Links\n\n";
@@ -757,11 +814,11 @@ class TermsPopup {
         formattedText += `**URL:** [${link.href}](${link.href})\n\n`;
       });
     }
-    
+
     // Add acceptance elements section with better categorization
     if (acceptanceElements.length > 0) {
       formattedText += "## ✍️ Acceptance Elements\n\n";
-      
+
       // Group by type for better organization
       const groupedElements = acceptanceElements.reduce((groups, element) => {
         const key = element.type.toUpperCase();
@@ -769,7 +826,7 @@ class TermsPopup {
         groups[key].push(element);
         return groups;
       }, {});
-      
+
       Object.entries(groupedElements).forEach(([type, elements]) => {
         formattedText += `### ${type} Elements (${elements.length})\n\n`;
         elements.forEach((element, index) => {
@@ -782,19 +839,38 @@ class TermsPopup {
         formattedText += "\n";
       });
     }
-    
-    // Add terms content if available with better structure
-    if (termsContent && !termsContent.error && termsContent.summary) {
+
+    // Add full terms content if available
+    if (fullTermsContent && fullTermsContent.length > 0) {
+      formattedText += "## 📖 Full Terms & Conditions Content\n\n";
+
+      fullTermsContent.forEach((termDoc, index) => {
+        if (termDoc.content && termDoc.content.trim()) {
+          formattedText += `### ${index + 1}. ${termDoc.title}\n\n`;
+          formattedText += `**Source URL:** [${termDoc.url}](${termDoc.url})\n\n`;
+
+          // Add the full content
+          const cleanContent = termDoc.content.trim();
+          formattedText += `**Full Content:**\n\n${cleanContent}\n\n`;
+
+          formattedText += `*📏 Content Length: ${cleanContent.length.toLocaleString()} characters*\n\n`;
+          formattedText += "---\n\n";
+        }
+      });
+    } else if (termsContent && !termsContent.error && termsContent.summary) {
+      // Fallback to preview content if full content is not available
       formattedText += "## 📖 Terms Content Preview\n\n";
-      
+
       // Split content into paragraphs for better readability
-      const paragraphs = termsContent.summary.split('\n\n').filter(p => p.trim());
+      const paragraphs = termsContent.summary
+        .split("\n\n")
+        .filter((p) => p.trim());
       paragraphs.forEach((paragraph, index) => {
         if (paragraph.trim()) {
           formattedText += `${paragraph.trim()}\n\n`;
         }
       });
-      
+
       if (termsContent.url) {
         formattedText += `**📍 Source:** [${termsContent.url}](${termsContent.url})\n\n`;
       }
@@ -802,20 +878,24 @@ class TermsPopup {
         formattedText += `*📏 Note: This is a preview of ${termsContent.fullLength.toLocaleString()} total characters*\n\n`;
       }
     }
-    
+
     // Add separator
     formattedText += "---\n\n";
-    
+
     // Add helpful context for the AI
     formattedText += "## 🤖 AI Analysis Context\n\n";
-    formattedText += "This document contains terms and conditions data extracted from a webpage. ";
-    formattedText += "The user may ask questions about privacy policies, user agreements, data collection, ";
-    formattedText += "cancellation policies, liability clauses, or other legal aspects. ";
-    formattedText += "Please provide clear, helpful analysis focusing on user rights and potential risks.\n\n";
-    
+    formattedText +=
+      "This document contains terms and conditions data extracted from a webpage. ";
+    formattedText +=
+      "The user may ask questions about privacy policies, user agreements, data collection, ";
+    formattedText +=
+      "cancellation policies, liability clauses, or other legal aspects. ";
+    formattedText +=
+      "Please provide clear, helpful analysis focusing on user rights and potential risks.\n\n";
+
     return {
       text: formattedText,
-      title: "Terms & Conditions Analysis"
+      title: "Terms & Conditions Analysis",
     };
   }
 }
@@ -839,20 +919,22 @@ class TextExtractor {
 
   initializeEventListeners() {
     document.getElementById("extractPage").addEventListener("click", () => {
-        this.extractPageText();
+      this.extractPageText();
     });
 
-    document.getElementById("extractSelection").addEventListener("click", () => {
+    document
+      .getElementById("extractSelection")
+      .addEventListener("click", () => {
         this.extractSelection();
-    });
+      });
 
     // Update to allow document and image upload
     document.getElementById("uploadDocument").addEventListener("click", () => {
-        document.getElementById("documentFile").click();
+      document.getElementById("documentFile").click();
     });
 
     document.getElementById("documentFile").addEventListener("change", (e) => {
-        this.handleDocumentUpload(e.target.files[0]);
+      this.handleDocumentUpload(e.target.files[0]);
     });
   }
 
@@ -959,19 +1041,22 @@ class TextExtractor {
 
     // Validate file type before upload - add image types
     const allowedTypes = [
-      'text/plain',
-      'application/pdf', 
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'image/svg+xml'
+      "text/plain",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "image/svg+xml",
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      this.showStatus("❌ Unsupported file type. Please upload .txt, .pdf, .doc, .docx, or image files.", "error");
+      this.showStatus(
+        "❌ Unsupported file type. Please upload .txt, .pdf, .doc, .docx, or image files.",
+        "error"
+      );
       return;
     }
 
@@ -984,88 +1069,92 @@ class TextExtractor {
     this.showStatus("Processing document...", "loading");
 
     try {
-        const formData = new FormData();
-        formData.append('document', file);
+      const formData = new FormData();
+      formData.append("document", file);
 
-        const response = await fetch('http://localhost:3000/api/ai/extraction', {
-            method: 'POST',
-            body: formData
+      const response = await fetch("http://localhost:3000/api/ai/extraction", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Upload failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to process document");
+      }
+
+      // Store the extracted content and metadata properly in chrome.storage.local
+      const extractionData = {
+        extractedText: result.extractedText,
+        extractedTitle: `Uploaded: ${result.fileName}`,
+        timestamp: Date.now(),
+        fileName: result.fileName,
+        fileType: result.fileType || file.type,
+        extractionTimestamp: result.timestamp,
+      };
+
+      await chrome.storage.local.set(extractionData);
+
+      this.showStatus("✅ Document processed! Opening viewer...", "success");
+
+      // Automatically open viewer window with proper positioning and sizing
+      try {
+        const viewerWindow = await chrome.windows.create({
+          url: chrome.runtime.getURL("viewer.html"),
+          type: "popup",
+          width: 1000,
+          height: 700,
+          left: Math.max(0, Math.round((screen.width - 1000) / 2)),
+          top: Math.max(0, Math.round((screen.height - 700) / 2)),
+          focused: true,
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Upload failed: ${response.status}`);
+        // Verify viewer window opened successfully
+        if (viewerWindow && viewerWindow.id) {
+          console.log(
+            `Viewer window opened successfully with ID: ${viewerWindow.id}`
+          );
+
+          // Update status to show successful completion
+          setTimeout(() => {
+            this.showStatus("✅ Document ready in viewer!", "success");
+          }, 500);
+        } else {
+          throw new Error("Failed to create viewer window");
         }
+      } catch (viewerError) {
+        console.error("Error opening viewer window:", viewerError);
+        this.showStatus(
+          "⚠️ Document processed, but viewer failed to open. Please click the extension icon to view.",
+          "error"
+        );
 
-        const result = await response.json();
-        
-        if (!result.success) {
-            throw new Error(result.error || "Failed to process document");
-        }
-
-        // Store the extracted content and metadata properly in chrome.storage.local
-        const extractionData = {
-            extractedText: result.extractedText,
-            extractedTitle: `Uploaded: ${result.fileName}`,
-            timestamp: Date.now(),
-            fileName: result.fileName,
-            fileType: result.fileType || file.type,
-            extractionTimestamp: result.timestamp
-        };
-
-        await chrome.storage.local.set(extractionData);
-
-        this.showStatus("✅ Document processed! Opening viewer...", "success");
-
-        // Automatically open viewer window with proper positioning and sizing
+        // Fallback: try to open in a new tab if popup fails
         try {
-            const viewerWindow = await chrome.windows.create({
-                url: chrome.runtime.getURL("viewer.html"),
-                type: "popup",
-                width: 1000,
-                height: 700,
-                left: Math.max(0, Math.round((screen.width - 1000) / 2)),
-                top: Math.max(0, Math.round((screen.height - 700) / 2)),
-                focused: true
-            });
-
-            // Verify viewer window opened successfully
-            if (viewerWindow && viewerWindow.id) {
-                console.log(`Viewer window opened successfully with ID: ${viewerWindow.id}`);
-                
-                // Update status to show successful completion
-                setTimeout(() => {
-                    this.showStatus("✅ Document ready in viewer!", "success");
-                }, 500);
-            } else {
-                throw new Error("Failed to create viewer window");
-            }
-
-        } catch (viewerError) {
-            console.error("Error opening viewer window:", viewerError);
-            this.showStatus("⚠️ Document processed, but viewer failed to open. Please click the extension icon to view.", "error");
-            
-            // Fallback: try to open in a new tab if popup fails
-            try {
-                await chrome.tabs.create({
-                    url: chrome.runtime.getURL("viewer.html"),
-                    active: true
-                });
-                this.showStatus("✅ Document opened in new tab!", "success");
-            } catch (tabError) {
-                console.error("Error opening viewer tab:", tabError);
-                this.showStatus("❌ Could not open viewer. Document is saved - try refreshing the extension.", "error");
-            }
+          await chrome.tabs.create({
+            url: chrome.runtime.getURL("viewer.html"),
+            active: true,
+          });
+          this.showStatus("✅ Document opened in new tab!", "success");
+        } catch (tabError) {
+          console.error("Error opening viewer tab:", tabError);
+          this.showStatus(
+            "❌ Could not open viewer. Document is saved - try refreshing the extension.",
+            "error"
+          );
         }
-
+      }
     } catch (error) {
-        console.error("Error uploading document:", error);
-        this.showStatus(`❌ ${error.message}`, "error");
+      console.error("Error uploading document:", error);
+      this.showStatus(`❌ ${error.message}`, "error");
     }
   }
 
-
-  
   async showFileViewer(fileData, fileType, title) {
     // Store the file data
     await chrome.storage.local.set({
