@@ -1,8 +1,7 @@
 {
-  "name": "extension-auth-example",
+  "name": "lawlens",
   "version": "1.0.0",
-  "description": "",
-  "type": "module",
+  "description": "Lawlens - AI-powered legal document analysis and text extraction",
   "main": "index.js",
   "scripts": {
     "build": "rollup -c",
