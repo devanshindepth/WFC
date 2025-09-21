@@ -1,12 +1,17 @@
 "use client";
-import { useChat } from '@ai-sdk/react';
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 const Chat = () => {
-  const { messages, input, handleInputChange, handleSubmit, status } = useChat({
-    api: '/api/ai/chat',
-  });
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -17,16 +22,66 @@ const Chat = () => {
     }
   }, [messages]);
 
-  const sendMessage = (messageText?: string) => {
-    if (messageText) {
-      // For predefined prompts, we need to append the message and send it
-      // The useChat hook handles this automatically when we call append with the message
-      const event = new Event('submit', { cancelable: true }) as unknown as React.FormEvent<HTMLFormElement>;
-      handleInputChange({ target: { value: messageText } } as React.ChangeEvent<HTMLInputElement>);
-      setTimeout(() => handleSubmit(event), 0);
-    } else {
-      handleSubmit();
+  const sendMessage = async (messageText?: string) => {
+    const messageContent = messageText || input.trim();
+
+    if (!messageContent) return;
+
+    const userMessage: Message = { role: 'user', content: messageContent };
+    const updatedMessages = [...messages, userMessage];
+
+    setMessages(updatedMessages);
+    setInput('');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: updatedMessages,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: data.message
+      };
+
+      setMessages([...updatedMessages, assistantMessage]);
+
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+
+      // Add error message to chat
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`
+      };
+      setMessages([...updatedMessages, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage();
   };
 
   const prompts = [
@@ -37,35 +92,67 @@ const Chat = () => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-3xl shadow-xl border border-gray-100">
+    <div className="max-w-4xl mx-auto p-2 bg-white rounded-3xl shadow-xl border border-gray-100">
+      {/* Error Display */}
+      {error && (
+        <div className="mb-1 p-2 bg-red-100 border border-red-300 rounded-lg">
+          <p className="text-red-700 font-semibold">Error:</p>
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
       <div ref={chatContainerRef} className="space-y-4 mb-4 max-h-96 overflow-y-auto">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${msg.role === 'user' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'}`}>
-              {msg.role === 'assistant' ? <ReactMarkdown>{msg.content}</ReactMarkdown> : msg.content}
+        {messages.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">
+            <p>Ask me any legal question to get started!</p>
+          </div>
+        ) : (
+          messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs lg:max-md px-4 py-2 rounded-2xl ${msg.role === 'user'
+                ? 'bg-gray-800 text-white text-right ml-auto'
+                : 'bg-gray-100 text-gray-900 text-left mr-auto'
+                }`}>
+                {msg.role === 'assistant' ? (
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                ) : (
+                  msg.content
+                )}
+              </div>
+            </div>
+          ))
+        )}
+
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
             </div>
           </div>
-        ))}
-        {status === 'streaming' && <div className="text-center text-gray-500">LegalPal is typing...</div>}
+        )}
       </div>
-      <div className="flex gap-2">
+
+      <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"
           value={input}
-          onChange={handleInputChange}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+          onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a legal question..."
           className="flex-1 px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900"
-          disabled={status === 'streaming'}
+          disabled={isLoading}
         />
         <button
-          onClick={() => sendMessage()}
-          disabled={status === 'streaming' || !input.trim()}
+          type="submit"
+          disabled={isLoading || !input.trim()}
           className="px-6 py-2 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 disabled:opacity-50"
         >
           Send
         </button>
-      </div>
+      </form>
 
       {/* Predefined Prompts */}
       <div className="mt-6">
@@ -75,7 +162,7 @@ const Chat = () => {
             <button
               key={idx}
               onClick={() => sendMessage(prompt)}
-              disabled={status === 'streaming'}
+              disabled={isLoading}
               className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 disabled:opacity-50 text-sm font-inter transition-colors"
             >
               {prompt}
