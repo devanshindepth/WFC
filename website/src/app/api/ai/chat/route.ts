@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { google } from '@ai-sdk/google';
-import { streamText } from 'ai';
+import { generateText } from 'ai';
 
-// Allow streaming responses up to 30 seconds
+// Allow responses up to 30 seconds
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
@@ -60,16 +60,26 @@ Key guidelines:
 
 For legal questions, provide clear, practical advice focused on protecting user rights.`;
 
-    // Use AI SDK with streaming
-    const result = streamText({
+    // Use AI SDK with generateText for JSON response
+    const result = await generateText({
       model: google('gemini-1.5-flash-latest'),
       messages: [{ role: 'system', content: systemPrompt }, ...userMessages],
       temperature: 0.7,
       maxTokens: 2048,
     });
 
-    // Return streaming response
-    return result.toDataStreamResponse();
+    // Return JSON response
+    return new Response(
+      JSON.stringify({
+        response: result.text,
+        usage: result.usage,
+        finishReason: result.finishReason
+      }),
+      { 
+        status: 200, 
+        headers: { 'Content-Type': 'application/json' } 
+      }
+    );
   } catch (error) {
     console.error('Legal chat error:', error);
     return new Response(
