@@ -16,9 +16,13 @@ const ReadSection = () => (
                                         <span className="text-sm font-semibold text-gray-800 font-inter">Deep Analysis</span>
                                     </div>
 
-                                    <h2 className="text-3xl lg:text-4xl xl:text-5xl font-baskerville font-bold text-gray-900 leading-tight">
+                                    <h2 className="text-3xl lg:text-4xl xl:text-5xl font-baskerville font-bold text-gray-900 leading-tight" style={{
+                                        color: '#4a5568',
+                                    }}>
                                         Read Between the
-                                        <span className="block text-gray-900">
+                                        <span className="block text-gray-900" style={{
+                                            color: '#4a5568',
+                                        }}>
                                             Legal Lines
                                         </span>
                                     </h2>

@@ -11,12 +11,14 @@ const FocusSection = () => (
               {/* Left Content */}
               <div className="space-y-6">
                 <div className="space-y-4">
-                  <div className="inline-flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full border border-gray-200">
+                  {/* <div className="inline-flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full border border-gray-200">
                     <div className="w-2 h-2 bg-gray-800 rounded-full animate-pulse"></div>
                     <span className="text-sm font-semibold text-gray-800 font-inter">AI-Powered Focus</span>
-                  </div>
+                  </div> */}
 
-                  <h2 className="text-3xl lg:text-4xl xl:text-5xl font-baskerville font-bold text-gray-900 leading-tight">
+                  <h2 className="text-3xl lg:text-4xl xl:text-5xl font-baskerville font-bold text-gray-900 leading-tight" style={{
+                    color: '#4a5568',
+                  }}>
                     Focus on What Really Matters
                   </h2>
 

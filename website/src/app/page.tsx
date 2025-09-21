@@ -1,13 +1,12 @@
-"use client"
-import StickyFeaturesSection from '@/components/sticky-features-section';
-import ChatSection from '../components/chat-section';
-import FocusSection from '../components/focus-section';
-import HeroSection from '../components/hero-section';
-import ReadSection from '../components/read-section';
-import Navbar from '@/components/navbar';
+"use client";
+import StickyFeaturesSection from "@/components/sticky-features-section";
+import ChatSection from "../components/chat-section";
+import FocusSection from "../components/focus-section";
+import HeroSection from "../components/hero-section";
+import ReadSection from "../components/read-section";
+import Navbar from "@/components/navbar";
 
 const LawlensLanding = () => {
-
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section - Moved to sticky features section */}
@@ -46,8 +45,6 @@ const LawlensLanding = () => {
         <ReadSection />
         <FocusSection />
       </StickyFeaturesSection>
-
-
 
       {/* Analysis Section - Commented out */}
       {/* <section className="py-20 bg-white">
@@ -199,7 +196,7 @@ const LawlensLanding = () => {
       </section> */}
 
       {/* Enhanced Footer */}
-      <footer id="footer" className="bg-white text-gray-900 py-16 border-t border-gray-200">
+      {/* <footer id="footer" className="bg-white text-gray-900 py-16 border-t border-gray-200">
         <div className="max-w-6xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-12">
             <div className="text-5xl font-baskerville font-bold mb-4 text-gray-900">
@@ -216,10 +213,9 @@ const LawlensLanding = () => {
             </p>
           </div>
         </div>
-      </footer>
-    </div >
+      </footer> */}
+    </div>
   );
 };
 
 export default LawlensLanding;
-

@@ -155,7 +155,7 @@ const Chat = () => {
       </form>
 
       {/* Predefined Prompts */}
-      <div className="mt-6">
+      <div className="mt-6" >
         <p className="text-sm text-gray-600 mb-3 font-inter">Quick questions:</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {prompts.map((prompt, idx) => (
