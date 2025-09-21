@@ -1,5 +1,5 @@
 {
-  "name": "website",
+  "name": "lawlens",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,20 +10,24 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.22",
+    "@gsap/react": "^2.1.2",
     "@react-oauth/google": "^0.12.2",
     "@types/jsonwebtoken": "^9.0.10",
     "ai": "^4.3.19",
     "axios": "^1.11.0",
     "better-auth": "^1.3.7",
+    "class-variance-authority": "^0.7.1",
     "cookies-next": "^6.1.0",
     "dotenv": "^17.2.1",
     "drizzle-orm": "^0.44.5",
+    "gsap": "^3.13.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.543.0",
     "next": "15.5.0",
     "postgres": "^3.4.7",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -36,6 +40,7 @@
     "eslint-config-next": "15.5.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
+    "tw-animate-css": "^1.3.8",
     "typescript": "^5"
   }
 }
