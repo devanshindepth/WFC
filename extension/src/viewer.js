@@ -211,61 +211,69 @@ class LegalChatApp {
         
         // Add some basic styling for better readability
         const styledHtml = `
-            <div class="formatted-document-content">
-                ${html}
-            </div>
-            <style>
-                .formatted-document-content {
-                    line-height: 1.6;
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                }
-                .document-heading-1 {
-                    font-size: 1.5em;
-                    font-weight: bold;
-                    margin: 1.5em 0 0.5em 0;
-                    color: #1f2937;
-                    border-bottom: 2px solid #e5e7eb;
-                    padding-bottom: 0.25em;
-                }
-                .document-heading-2 {
-                    font-size: 1.3em;
-                    font-weight: bold;
-                    margin: 1.25em 0 0.5em 0;
-                    color: #374151;
-                }
-                .document-heading-3 {
-                    font-size: 1.1em;
-                    font-weight: bold;
-                    margin: 1em 0 0.5em 0;
-                    color: #4b5563;
-                }
-                .document-heading-4 {
-                    font-size: 1em;
-                    font-weight: bold;
-                    margin: 0.75em 0 0.25em 0;
-                    color: #6b7280;
-                }
-                .document-heading-caps {
-                    font-size: 1.1em;
-                    font-weight: bold;
-                    margin: 1em 0 0.5em 0;
-                    color: #4b5563;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-                .document-paragraph {
-                    margin: 0.75em 0;
-                    text-align: justify;
-                }
-                .document-list {
-                    margin: 0.75em 0;
-                    padding-left: 1.5em;
-                }
-                .document-list li {
-                    margin: 0.25em 0;
-                }
-            </style>
-        `;
+    <div class="formatted-document-content">
+        ${html}
+    </div>
+    <style>
+        .formatted-document-content {
+            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .document-heading-1 {
+            font-size: 1.75em;
+            font-weight: 700;
+            margin: 2em 0 0.75em 0;
+            color: #1f2937;
+            border-bottom: 2px solid #374151;
+            padding-bottom: 0.5em;
+        }
+        .document-heading-2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin: 1.5em 0 0.75em 0;
+            color: #1f2937;
+        }
+        .document-heading-3 {
+            font-size: 1.25em;
+            font-weight: 600;
+            margin: 1.25em 0 0.5em 0;
+            color: #374151;
+        }
+        .document-heading-4 {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin: 1em 0 0.5em 0;
+            color: #4b5563;
+        }
+        .document-heading-caps {
+            font-size: 1.1em;
+            font-weight: 700;
+            margin: 1.25em 0 0.5em 0;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        .document-paragraph {
+            margin: 1em 0;
+            text-align: left;
+            color: #374151;
+            line-height: 1.7;
+        }
+        .document-list {
+            margin: 1em 0;
+            padding-left: 1.5em;
+            color: #374151;
+        }
+        .document-list li {
+            margin: 0.5em 0;
+            line-height: 1.6;
+        }
+    </style>
+`
         
         return styledHtml;
     }
@@ -467,89 +475,99 @@ class LegalChatApp {
             const sectionIcon = section.type === 'heading' ? 'Head' : 'Clause';
             const sectionClass = section.type === 'heading' ? 'focus-heading' : 'focus-content';
             
-            this.focusClauseContent.innerHTML = `
-                <div class="focus-section ${sectionClass}" data-section-id="${section.id}">
-                    <div class="focus-section-header">
-                        <span class="focus-section-icon">${sectionIcon}</span>
-                        <span class="focus-section-type">${sectionType} ${section.index}</span>
-                        <button class="focus-explain-btn" data-section-id="${section.id}">
-                            💬 Explain This
-                        </button>
-                    </div>
-                    <div class="focus-section-content">
-                        <div class="focus-section-text">${this.escapeHtml(section.text)}</div>
-                    </div>
-                </div>
-                <style>
-                    .focus-section {
-                        background: #ffffff;
-                        border-radius: 0.75rem;
-                        border: 2px solid #e5e7eb;
-                        overflow: hidden;
-                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                    }
-                    .focus-heading {
-                        border-color: #059669;
-                        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-                    }
-                    .focus-content {
-                        border-color: #3b82f6;
-                        background: #ffffff;
-                    }
-                    .focus-section-header {
-                        display: flex;
-                        align-items: center;
-                        gap: 0.75rem;
-                        padding: 1rem 1.5rem;
-                        background: rgba(0, 0, 0, 0.02);
-                        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-                    }
-                    .focus-heading .focus-section-header {
-                        background: rgba(5, 150, 105, 0.1);
-                        border-bottom-color: rgba(5, 150, 105, 0.2);
-                    }
-                    .focus-content .focus-section-header {
-                        background: rgba(59, 130, 246, 0.1);
-                        border-bottom-color: rgba(59, 130, 246, 0.2);
-                    }
-                    .focus-section-icon {
-                        font-size: 1.25rem;
-                    }
-                    .focus-section-type {
-                        font-weight: 600;
-                        color: #1f2937;
-                        flex: 1;
-                    }
-                    .focus-explain-btn {
-                        background: #3b82f6;
-                        color: white;
-                        border: none;
-                        padding: 0.5rem 1rem;
-                        border-radius: 0.375rem;
-                        font-size: 0.875rem;
-                        cursor: pointer;
-                        transition: background-color 0.2s ease;
-                    }
-                    .focus-explain-btn:hover {
-                        background: #2563eb;
-                    }
-                    .focus-heading .focus-explain-btn {
-                        background: #059669;
-                    }
-                    .focus-heading .focus-explain-btn:hover {
-                        background: #047857;
-                    }
-                    .focus-section-content {
-                        padding: 1.5rem;
-                    }
-                    .focus-section-text {
-                        line-height: 1.7;
-                        font-size: 1rem;
-                        color: #374151;
-                        text-align: justify;
-                    }
-                </style>
-            `;
+
+this.focusClauseContent.innerHTML = `
+    <div class="focus-section ${sectionClass}" data-section-id="${section.id}">
+        <div class="focus-section-header">
+            <span class="focus-section-icon">${sectionIcon}</span>
+            <span class="focus-section-type">${sectionType} ${section.index}</span>
+            <button class="focus-explain-btn" data-section-id="${section.id}">
+                💬 Explain This
+            </button>
+        </div>
+        <div class="focus-section-content">
+            <div class="focus-section-text">${this.escapeHtml(section.text)}</div>
+        </div>
+    </div>
+    <style>
+        .focus-section {
+            background: #ffffff;
+            border-radius: 0.75rem;
+            border: 2px solid #e5e7eb;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.2s ease;
+        }
+        .focus-section:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+        .focus-heading {
+            border-color: #6b7280;
+            background: #ffffff;
+        }
+        .focus-content {
+            border-color: #6b7280;
+            background: #ffffff;
+        }
+        .focus-section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .focus-heading .focus-section-header {
+            background: #f3f4f6;
+            border-bottom-color: #d1d5db;
+        }
+        .focus-content .focus-section-header {
+            background: #f3f4f6;
+            border-bottom-color: #d1d5db;
+        }
+        .focus-section-icon {
+            font-size: 1.25rem;
+            color: #4b5563;
+        }
+        .focus-section-type {
+            font-weight: 600;
+            color: #1f2937;
+            flex: 1;
+        }
+        .focus-explain-btn {
+            background: #4b5563;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .focus-explain-btn:hover {
+            background: #374151;
+            transform: translateY(-1px);
+        }
+        .focus-heading .focus-explain-btn {
+            background: #6b7280;
+        }
+        .focus-heading .focus-explain-btn:hover {
+            background: #4b5563;
+        }
+        .focus-section-content {
+            padding: 1.5rem;
+            background: #ffffff;
+        }
+        .focus-section-text {
+            line-height: 1.7;
+            font-size: 1rem;
+            color: #374151;
+            text-align: justify;
+        }
+    </style>
+`
+
             
             // Add click handler for the explain button
             const explainBtn = this.focusClauseContent.querySelector('.focus-explain-btn');
@@ -575,7 +593,7 @@ class LegalChatApp {
             this.focusClauseCounter.textContent = 'No content available';
             this.focusClauseContent.innerHTML = `
                 <div class="focus-no-content">
-                    <div class="no-content-icon">📄</div>
+                    <div class="no-content-icon"></div>
                     <h3>No Document Loaded</h3>
                     <p>Please upload a document using the extension popup to use Focus Mode.</p>
                 </div>
@@ -832,7 +850,7 @@ class LegalChatApp {
         // Enhanced section rendering with better visual distinction
         const sectionsHtml = this.document.map(section => {
             const sectionClass = section.type === 'heading' ? 'document-section heading-section' : 'document-section content-section';
-            const sectionIcon = section.type === 'heading' ? '📋' : '📄';
+            const sectionIcon = section.type === 'heading' ? '' : '';
             
             return `
                 <div class="${sectionClass}" data-section-id="${section.id}">
@@ -846,119 +864,121 @@ class LegalChatApp {
         }).join('');
 
         this.documentContentElement.innerHTML = `
-            <div class="chat-document-container">
-                ${metadataHtml}
-                <div class="document-sections">
-                    ${sectionsHtml}
-                </div>
-                <div class="tip-box">
-                    <p><strong>💡 Tip:</strong> Click on any numbered section to get an AI explanation. You can also select text and ask questions directly in the chat.</p>
-                </div>
-            </div>
-            <style>
-                .document-metadata {
-                    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-                    padding: 1rem;
-                    border-radius: 0.75rem;
-                    margin-bottom: 1.5rem;
-                    font-size: 0.875rem;
-                    border-left: 4px solid #2563eb;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                }
-                .metadata-title {
-                    font-weight: 600;
-                    color: #1f2937;
-                    margin-bottom: 0.5rem;
-                    font-size: 1rem;
-                }
-                .metadata-info, .metadata-file, .metadata-type {
-                    color: #1e40af;
-                    margin: 0.25rem 0;
-                }
-                .document-sections {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.75rem;
-                }
-                .document-section {
-                    border: 1px solid #e5e7eb;
-                    border-radius: 0.5rem;
-                    transition: all 0.2s ease;
-                    cursor: pointer;
-                    position: relative;
-                    overflow: hidden;
-                }
-                .document-section:hover {
-                    border-color: #3b82f6;
-                    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
-                    transform: translateY(-1px);
-                }
-                .heading-section {
-                    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-                }
-                .content-section {
-                    background: #ffffff;
-                }
-                .section-tooltip {
-                    position: absolute;
-                    top: -2rem;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: #1f2937;
-                    color: white;
-                    padding: 0.25rem 0.5rem;
-                    border-radius: 0.25rem;
-                    font-size: 0.75rem;
-                    opacity: 0;
-                    pointer-events: none;
-                    transition: opacity 0.2s ease;
-                    white-space: nowrap;
-                    z-index: 10;
-                }
-                .document-section:hover .section-tooltip {
-                    opacity: 1;
-                }
-                .section-content {
-                    display: flex;
-                    align-items: flex-start;
-                    padding: 1rem;
-                    gap: 0.75rem;
-                }
-                .section-number {
-                    flex-shrink: 0;
-                    width: 2.5rem;
-                    height: 2.5rem;
-                    background: #3b82f6;
-                    color: white;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-weight: 600;
-                    font-size: 0.875rem;
-                }
-                .heading-section .section-number {
-                    background: #059669;
-                }
-                .section-text {
-                    flex: 1;
-                    line-height: 1.6;
-                    color: #374151;
-                }
-                .tip-box {
-                    margin-top: 1.5rem;
-                    padding: 1rem;
-                    background: #f9fafb;
-                    border-radius: 0.5rem;
-                    border-left: 4px solid #10b981;
-                }
-                .tip-box p {
-                    margin: 0;
-                    color: #065f46;
-                    font-size: 0.875rem;
-                }
-            </style>
-        `;
+    <div class="chat-document-container">
+        ${metadataHtml}
+        <div class="document-sections">
+            ${sectionsHtml}
+        </div>
+        <div class="tip-box">
+            <p><strong>Tip:</strong> Click on any numbered section to get an AI explanation. You can also select text and ask questions directly in the chat.</p>
+        </div>
+    </div>
+    <style>
+        .document-metadata {
+            background: #ffffff;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #4b5563;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .metadata-title {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+        .metadata-info, .metadata-file, .metadata-type {
+            color: #374151;
+            margin: 0.25rem 0;
+        }
+        .document-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .document-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .document-section:hover {
+            border-color: #6b7280;
+            box-shadow: 0 2px 8px rgba(107, 114, 128, 0.15);
+            transform: translateY(-1px);
+        }
+        .heading-section {
+            background: #f9fafb;
+        }
+        .content-section {
+            background: #ffffff;
+        }
+        .section-tooltip {
+            position: absolute;
+            top: -2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1f2937;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            white-space: nowrap;
+            z-index: 10;
+        }
+        .document-section:hover .section-tooltip {
+            opacity: 1;
+        }
+        .section-content {
+            display: flex;
+            align-items: flex-start;
+            padding: 1rem;
+            gap: 0.75rem;
+        }
+        .section-number {
+            flex-shrink: 0;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: #4b5563;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .heading-section .section-number {
+            background: #374151;
+        }
+        .section-text {
+            flex: 1;
+            line-height: 1.6;
+            color: #374151;
+        }
+        .tip-box {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #6b7280;
+        }
+        .tip-box p {
+            margin: 0;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+    </style>
+`
 
         // Add click handlers for sections
         this.documentContentElement.querySelectorAll('.document-section').forEach(sectionElement => {
@@ -981,7 +1001,7 @@ class LegalChatApp {
         if (!this.extractedData?.text) {
             this.readDocumentContent.innerHTML = `
                 <div class="no-content-message">
-                    <div class="no-content-icon">📄</div>
+                    <div class="no-content-icon"></div>
                     <h3>No Document Content</h3>
                     <p>Please upload a document using the extension popup to view content here.</p>
                 </div>
@@ -997,10 +1017,10 @@ class LegalChatApp {
                 <div class="read-metadata">
                     <div class="read-metadata-title">${this.escapeHtml(this.extractedData.title)}</div>
                     <div class="read-metadata-details">
-                        <span class="metadata-item">📅 Extracted: ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</span>
+                        <span class="metadata-item">Extracted: ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</span>
                         ${this.extractedData.fileName ? `<span class="metadata-item">📁 File: ${this.escapeHtml(this.extractedData.fileName)}</span>` : ''}
                         ${this.extractedData.fileType ? `<span class="metadata-item">🏷️ Type: ${this.escapeHtml(this.extractedData.fileType)}</span>` : ''}
-                        <span class="metadata-item">📊 Length: ${this.extractedData.text.length.toLocaleString()} characters</span>
+                        <span class="metadata-item">Length: ${this.extractedData.text.length.toLocaleString()} characters</span>
                     </div>
                 </div>
             `;
@@ -1011,105 +1031,114 @@ class LegalChatApp {
 
         // Set the innerHTML of the read mode container with enhanced styling
         this.readDocumentContent.innerHTML = `
-            <div class="read-document-wrapper">
-                ${metadataHtml}
-                <div class="read-content-body">
-                    ${formattedHtml}
-                </div>
-                <div class="read-tip-box">
-                    <div class="tip-icon">💡</div>
-                    <div class="tip-content">
-                        <strong>Reading Mode Tips:</strong>
-                        <ul>
-                            <li>Select any text to get an AI explanation in chat mode</li>
-                            <li>Use Focus Mode for section-by-section reading</li>
-                            <li>Scroll through the document at your own pace</li>
-                        </ul>
-                    </div>
-                </div>
+    <div class="read-document-wrapper">
+        ${metadataHtml}
+        <div class="read-content-body">
+            ${formattedHtml}
+        </div>
+        <div class="read-tip-box">
+            <div class="tip-icon">ℹ</div>
+            <div class="tip-content">
+                <strong>Reading Mode Tips:</strong>
+                <ul>
+                    <li>Select any text to get an AI explanation in chat mode</li>
+                    <li>Use Focus Mode for section-by-section reading</li>
+                    <li>Scroll through the document at your own pace</li>
+                </ul>
             </div>
-            <style>
-                .no-content-message {
-                    text-align: center;
-                    padding: 3rem 1rem;
-                    color: #6b7280;
-                }
-                .no-content-icon {
-                    font-size: 3rem;
-                    margin-bottom: 1rem;
-                }
-                .read-metadata {
-                    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-                    padding: 1.5rem;
-                    border-radius: 0.75rem;
-                    margin-bottom: 2rem;
-                    border-left: 4px solid #059669;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                }
-                .read-metadata-title {
-                    font-weight: 700;
-                    color: #1f2937;
-                    margin-bottom: 0.75rem;
-                    font-size: 1.25rem;
-                }
-                .read-metadata-details {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 0.75rem;
-                }
-                .metadata-item {
-                    background: rgba(255, 255, 255, 0.7);
-                    padding: 0.25rem 0.75rem;
-                    border-radius: 1rem;
-                    font-size: 0.875rem;
-                    color: #065f46;
-                    border: 1px solid rgba(5, 150, 105, 0.2);
-                }
-                .read-content-body {
-                    background: #ffffff;
-                    padding: 2rem;
-                    border-radius: 0.75rem;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                    border: 1px solid #e5e7eb;
-                    margin-bottom: 2rem;
-                    max-width: none;
-                }
-                .read-tip-box {
-                    display: flex;
-                    align-items: flex-start;
-                    gap: 1rem;
-                    padding: 1.5rem;
-                    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-                    border-radius: 0.75rem;
-                    border-left: 4px solid #f59e0b;
-                    margin-top: 2rem;
-                }
-                .tip-icon {
-                    font-size: 1.5rem;
-                    flex-shrink: 0;
-                }
-                .tip-content {
-                    color: #92400e;
-                    font-size: 0.875rem;
-                }
-                .tip-content strong {
-                    color: #78350f;
-                    display: block;
-                    margin-bottom: 0.5rem;
-                }
-                .tip-content ul {
-                    margin: 0;
-                    padding-left: 1.25rem;
-                }
-                .tip-content li {
-                    margin: 0.25rem 0;
-                }
-                .read-document-wrapper {
-                    max-width: 100%;
-                    margin: 0 auto;
-                }
-            </style>
-        `;
+        </div>
+    </div>
+    <style>
+        .no-content-message {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6b7280;
+        }
+        .no-content-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        /* Updated metadata section to use white and gray theme */
+        .read-metadata {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            margin-bottom: 2rem;
+            border-left: 4px solid #4b5563;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .read-metadata-title {
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.75rem;
+            font-size: 1.25rem;
+        }
+        .read-metadata-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        /* Updated metadata items to use gray theme */
+        .metadata-item {
+            background: #f9fafb;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+        .read-content-body {
+            background: #ffffff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e5e7eb;
+            margin-bottom: 2rem;
+            max-width: none;
+        }
+        /* Updated tip box to use white and gray theme */
+        .read-tip-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1.5rem;
+            background: #f9fafb;
+            border-radius: 0.75rem;
+            border-left: 4px solid #6b7280;
+            margin-top: 2rem;
+            border: 1px solid #e5e7eb;
+        }
+        /* Updated tip icon to use information symbol instead of emoji */
+        .tip-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+            color: #4b5563;
+            font-weight: bold;
+        }
+        /* Updated tip content colors to use gray theme */
+        .tip-content {
+            color: #4b5563;
+            font-size: 0.875rem;
+        }
+        .tip-content strong {
+            color: #1f2937;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        .tip-content ul {
+            margin: 0;
+            padding-left: 1.25rem;
+        }
+        .tip-content li {
+            margin: 0.25rem 0;
+        }
+        .read-document-wrapper {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+    </style>
+`
     }
 
     handleClauseClick(clause) {
@@ -1139,7 +1168,7 @@ class LegalChatApp {
         const errorHtml = `
             <div class="clause" style="cursor: default;">
                 <div class="clause-content">
-                    <div class="clause-number" style="background: #fee2e2; color: #b91c1c;">!</div>
+                    <div class="clause-number" style="background: #fee2e2; color: #000000ff;">!</div>
                     <div class="clause-text">${this.escapeHtml(message)}</div>
                 </div>
             </div>
@@ -1158,8 +1187,38 @@ class LegalChatApp {
         return div.innerHTML;
     }
 }
-
+        
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.legalChatApp = new LegalChatApp();
+    const resizeHandle = document.getElementById('resizeHandle');
+            const chatPanel = document.querySelector('.chat-panel');
+            const documentPanel = document.querySelector('.document-panel');
+            
+            let isResizing = false;
+            
+            resizeHandle.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+                
+                const containerRect = chatPanel.parentElement.getBoundingClientRect();
+                const percentage = (e.clientX - containerRect.left) / containerRect.width * 100;
+                const newChatWidth = Math.min(Math.max(percentage, 20), 80); // Limit between 20% and 80%
+                
+                chatPanel.style.flex = `0 0 ${newChatWidth}%`;
+                documentPanel.style.flex = `0 0 ${100 - newChatWidth}%`;
+            });
+            
+            document.addEventListener('mouseup', function() {
+                isResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            });
+    
 });

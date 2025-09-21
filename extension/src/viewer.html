@@ -13,7 +13,7 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             height: 100vh;
-            background-color: #f9fafb;
+            background-color: #ffffff;
             overflow: hidden;
         }
 
@@ -26,7 +26,7 @@
             align-items: center;
             justify-content: space-between;
             padding: 0 1.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
 
         .nav-left h1 {
@@ -44,9 +44,10 @@
         .mode-toggle {
             display: flex;
             align-items: center;
-            background: #f3f4f6;
+            background: #f9fafb;
             border-radius: 0.5rem;
             padding: 0.25rem;
+            border: 1px solid #e5e7eb;
         }
 
         .mode-btn {
@@ -64,27 +65,36 @@
         }
 
         .mode-btn:hover {
-            color: #1f2937;
+            color: #000000;
+            background: #f3f4f6;
         }
 
         .mode-btn-active {
-            background: #2563eb;
+            background: #1f2937;
             color: white;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
+        .mode-btn-active:hover {
+            background: #000000;
+            color: white;
+        }
+
+        /* Enhanced icon styling for better consistency */
         .mode-btn svg {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             margin-right: 0.5rem;
+            stroke-width: 1.5;
         }
 
         .read-mode-toggle {
             display: none;
             align-items: center;
-            background: #f3f4f6;
+            background: #f9fafb;
             border-radius: 0.5rem;
             padding: 0.25rem;
+            border: 1px solid #e5e7eb;
         }
 
         .read-mode-btn {
@@ -102,19 +112,27 @@
         }
 
         .read-mode-btn:hover {
-            color: #1f2937;
+            color: #000000;
+            background: #f3f4f6;
         }
 
         .read-mode-btn-active {
-            background: #059669;
+            background: #1f2937;
             color: white;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
+        .read-mode-btn-active:hover {
+            background: #000000;
+            color: white;
+        }
+
+        /* Enhanced icon styling for read mode buttons */
         .read-mode-btn svg {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             margin-right: 0.5rem;
+            stroke-width: 1.5;
         }
 
         /* Main Content Area */
@@ -136,19 +154,29 @@
             border-right: 1px solid #e5e7eb;
         }
 
+        /* Standardized header styling across all modes */
         .chat-header {
             display: flex;
             align-items: center;
-            padding: 1rem;
-            background: linear-gradient(to right, #2563eb, #1d4ed8);
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: #1f2937;
             color: white;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            min-height: 64px;
         }
 
+        .chat-header-left {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Enhanced header icon styling */
         .chat-header svg {
             width: 24px;
             height: 24px;
             margin-right: 12px;
+            stroke-width: 1.5;
         }
 
         .chat-header h1 {
@@ -161,6 +189,7 @@
             padding: 1rem;
             overflow-y: auto;
             scroll-behavior: smooth;
+            background: #ffffff;
         }
 
         .welcome-message {
@@ -180,6 +209,7 @@
             font-size: 1.125rem;
             font-weight: 500;
             margin-bottom: 0.5rem;
+            color: #1f2937;
         }
 
         .message {
@@ -204,23 +234,25 @@
         }
 
         .message.user .message-bubble {
-            background: #2563eb;
+            background: #1f2937;
             color: white;
             border-bottom-right-radius: 0.375rem;
         }
 
         .message.user .message-bubble:hover {
-            background: #1d4ed8;
+            background: #000000;
         }
 
         .message.ai .message-bubble {
-            background: #f3f4f6;
+            background: #f9fafb;
             color: #374151;
             border-bottom-left-radius: 0.375rem;
+            border: 1px solid #e5e7eb;
         }
 
         .message.ai .message-bubble:hover {
-            background: #e5e7eb;
+            background: #f3f4f6;
+            border-color: #d1d5db;
         }
 
         .message-text {
@@ -245,7 +277,7 @@
             width: 16px;
             height: 16px;
             border: 2px solid #e5e7eb;
-            border-top: 2px solid #2563eb;
+            border-top: 2px solid #1f2937;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -274,16 +306,17 @@
             border-radius: 9999px;
             outline: none;
             transition: all 0.2s;
+            background: white;
         }
 
         .message-input:focus {
-            border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            border-color: #1f2937;
+            box-shadow: 0 0 0 3px rgba(31, 41, 55, 0.1);
         }
 
         .send-button {
             padding: 0.75rem;
-            background: #2563eb;
+            background: #1f2937;
             color: white;
             border: none;
             border-radius: 50%;
@@ -295,7 +328,7 @@
         }
 
         .send-button:hover:not(:disabled) {
-            background: #1d4ed8;
+            background: #000000;
         }
 
         .send-button:disabled {
@@ -316,14 +349,16 @@
             background: white;
         }
 
+        /* Standardized document header styling to match chat header */
         .document-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 1rem;
-            background: linear-gradient(to right, #374151, #1f2937);
+            padding: 1rem 1.5rem;
+            background: #1f2937;
             color: white;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            min-height: 64px;
         }
 
         .document-header-left {
@@ -331,10 +366,12 @@
             align-items: center;
         }
 
+        /* Enhanced document header icon styling */
         .document-header svg {
             width: 24px;
             height: 24px;
             margin-right: 12px;
+            stroke-width: 1.5;
         }
 
         .document-title {
@@ -342,18 +379,21 @@
             font-weight: 600;
         }
 
+        /* Enhanced refresh button styling */
         .refresh-button {
-            padding: 0.5rem;
-            background: transparent;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
             color: white;
-            border: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 0.5rem;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .refresh-button:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.2);
+            background: #000000;
+            border-color: #000000;
+            transform: translateY(-1px);
         }
 
         .refresh-button:disabled {
@@ -364,6 +404,7 @@
         .refresh-button svg {
             width: 20px;
             height: 20px;
+            stroke-width: 1.5;
         }
 
         .document-content {
@@ -371,6 +412,7 @@
             padding: 1.5rem;
             overflow-y: auto;
             scroll-behavior: smooth;
+            background: #ffffff;
         }
 
         .loading-document {
@@ -396,18 +438,20 @@
             cursor: pointer;
             transition: all 0.2s;
             line-height: 1.6;
+            background: white;
         }
 
         .clause:hover {
-            border-color: #93c5fd;
-            background: #eff6ff;
+            border-color: #1f2937;
+            background: #f9fafb;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .clause-tooltip {
             position: absolute;
             top: 0.5rem;
             right: 0.5rem;
-            background: #2563eb;
+            background: #1f2937;
             color: white;
             padding: 0.25rem 0.5rem;
             border-radius: 9999px;
@@ -430,14 +474,15 @@
             flex-shrink: 0;
             width: 32px;
             height: 32px;
-            background: #f3f4f6;
-            color: #6b7280;
+            background: #f9fafb;
+            color: #1f2937;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 0.875rem;
             font-weight: 500;
+            border: 1px solid #e5e7eb;
         }
 
         .clause-text {
@@ -448,14 +493,14 @@
         .tip-box {
             margin-top: 2rem;
             padding: 1rem;
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
             border-radius: 0.5rem;
         }
 
         .tip-box p {
             font-size: 0.875rem;
-            color: #1e40af;
+            color: #1f2937;
         }
 
         /* Read Mode Layout */
@@ -465,14 +510,16 @@
             flex-direction: column;
         }
 
+        /* Standardized read header styling to match other headers */
         .read-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 1rem;
-            background: linear-gradient(to right, #059669, #047857);
+            padding: 1rem 1.5rem;
+            background: #1f2937;
             color: white;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            min-height: 64px;
         }
 
         .read-content {
@@ -492,10 +539,11 @@
             flex: 1;
             padding: 2rem;
             overflow-y: auto;
+            background: #ffffff;
         }
 
         .read-document-wrapper {
-            max-width: 4rem;
+            max-width: 78ch;
             margin: 0 auto;
         }
 
@@ -507,18 +555,20 @@
             border-radius: 0.5rem;
             transition: all 0.2s;
             line-height: 1.8;
+            background: white;
         }
 
         .clause-read:hover {
-            border-color: #10b981;
-            background: #ecfdf5;
+            border-color: #1f2937;
+            background: #f9fafb;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .clause-read-tooltip {
             position: absolute;
             top: 0.5rem;
             right: 0.5rem;
-            background: #059669;
+            background: #1f2937;
             color: white;
             padding: 0.25rem 0.5rem;
             border-radius: 9999px;
@@ -541,14 +591,15 @@
             flex-shrink: 0;
             width: 40px;
             height: 40px;
-            background: #d1fae5;
-            color: #047857;
+            background: #f9fafb;
+            color: #1f2937;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1rem;
             font-weight: bold;
+            border: 1px solid #e5e7eb;
         }
 
         .clause-read-text {
@@ -561,14 +612,14 @@
         .read-tip-box {
             margin-top: 2rem;
             padding: 1.5rem;
-            background: #ecfdf5;
-            border: 1px solid #a7f3d0;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
             border-radius: 0.5rem;
         }
 
         .read-tip-box p {
             font-size: 0.875rem;
-            color: #047857;
+            color: #1f2937;
         }
 
         /* Focus Read Mode */
@@ -578,14 +629,16 @@
             height: 100%;
         }
 
+        /* Enhanced focus header styling with consistent dimensions */
         .focus-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 1rem;
-            background: linear-gradient(to right, #7c3aed, #6d28d9);
+            padding: 1rem 1.5rem;
+            background: #1f2937;
             color: white;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            min-height: 64px;
         }
 
         .focus-header-left {
@@ -593,12 +646,22 @@
             align-items: center;
         }
 
-        .focus-clause-counter {
-            margin-left: 1rem;
-            color: #ddd6fe;
-            font-size: 0.875rem;
+        /* Enhanced focus header icon styling */
+        .focus-header svg {
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
+            stroke-width: 1.5;
         }
 
+        .focus-clause-counter {
+            margin-left: 1rem;
+            color: #d1d5db;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        /* Enhanced focus navigation controls styling */
         .focus-nav {
             display: flex;
             align-items: center;
@@ -606,17 +669,22 @@
         }
 
         .focus-nav-btn {
-            padding: 0.5rem;
-            background: transparent;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
             color: white;
-            border: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 0.5rem;
             cursor: pointer;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .focus-nav-btn:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.2);
+            background: #000000;
+            border-color: #000000;
+            transform: translateY(-1px);
         }
 
         .focus-nav-btn:disabled {
@@ -627,14 +695,17 @@
         .focus-nav-btn svg {
             width: 20px;
             height: 20px;
+            stroke-width: 1.5;
         }
 
+        /* Enhanced focus clause container styling */
         .focus-clause-container {
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem;
+            padding: 3rem 2rem;
+            background: #f9fafb;
         }
 
         .focus-clause {
@@ -642,34 +713,39 @@
             width: 100%;
         }
 
+        /* Enhanced focus clause content styling */
         .focus-clause-content {
             display: flex;
             align-items: flex-start;
             gap: 1.5rem;
-            padding: 2rem;
-            border: 2px solid #ddd6fe;
-            border-radius: 0.75rem;
+            padding: 2.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 1rem;
             background: white;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease;
         }
 
         .focus-clause-content:hover {
-            border-color: #a855f7;
+            border-color: #1f2937;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            transform: translateY(-2px);
         }
 
         .focus-clause-number {
             flex-shrink: 0;
-            width: 48px;
-            height: 48px;
-            background: #f3e8ff;
-            color: #7c3aed;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+            color: #1f2937;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.25rem;
+            font-size: 1.5rem;
             font-weight: bold;
+            border: 2px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .focus-clause-text {
@@ -679,8 +755,9 @@
             user-select: text;
         }
 
+        /* Enhanced focus instructions styling */
         .focus-instructions {
-            margin-top: 1.5rem;
+            margin-top: 2rem;
             text-align: center;
         }
 
@@ -688,31 +765,31 @@
             font-size: 0.875rem;
             color: #6b7280;
             margin-bottom: 1rem;
+            font-weight: 500;
         }
 
         .focus-shortcuts {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 1rem;
+            gap: 1.5rem;
         }
 
         .focus-shortcuts kbd {
-            padding: 0.25rem 0.5rem;
-            background: #f3f4f6;
-            border: 1px solid #d1d5db;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .focus-shortcuts span {
-            font-size: 0.75rem;
+            font-size: 0.875rem;
             color: #6b7280;
-        }
-
-        .read-document-wrapper {
-            max-width: 78ch; 
-            margin: 0 auto;
+            font-weight: 500;
         }
 
         .read-document-wrapper h2 {
@@ -734,9 +811,76 @@
         .read-document-wrapper p {
             margin-bottom: 1.4rem;
             text-align: left;
-            font-size: 1.125rem; 
-            line-height: 1.95;  
+            font-size: 1.125rem;
+            line-height: 1.95;
             word-spacing: 0.1em;
+            color: #374151;
+        }
+
+        .chat-mode-container {
+            display: flex;
+            height: 100%;
+            position: relative;
+        }
+
+        .resize-handle {
+            width: 8px;
+            background: #e5e7eb;
+            cursor: col-resize;
+            transition: background-color 0.2s;
+            position: relative;
+            z-index: 10;
+        }
+
+        .resize-handle:hover {
+            background: #1f2937;
+        }
+
+        /* Ensure all headers have the same height */
+        .chat-header, .document-header, .read-header, .focus-header {
+            height: 64px;
+            min-height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            background: #1f2937;
+            color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Adjust header content alignment */
+        .chat-header-left, 
+        .document-header-left, 
+        .focus-header-left {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Ensure consistent header icon styling */
+        .chat-header svg, 
+        .document-header svg, 
+        .focus-header svg {
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
+            stroke-width: 1.5;
+        }
+
+        /* Adjust panel heights to account for fixed header heights */
+        .chat-panel, 
+        .document-panel {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .messages-container, 
+        .document-content, 
+        .read-document-content, 
+        .focus-clause-container {
+            flex: 1;
+            overflow: auto;
         }
 
         /* Responsive */
@@ -760,7 +904,7 @@
     <!-- Top Navigation Bar -->
     <div class="top-nav">
         <div class="nav-left">
-            <h1>Legal Document Assistant</h1>
+            <h1>Lawlens</h1>
         </div>
         
         <div class="nav-right">
@@ -806,10 +950,13 @@
             <div class="chat-panel">
                 <!-- Chat Header -->
                 <div class="chat-header">
-                    <svg fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-                    </svg>
-                    <h1>Legal Assistant Chat</h1>
+                    <!-- Added header-left wrapper for consistency -->
+                    <div class="chat-header-left">
+                        <svg fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                        </svg>
+                        <h1>Legal Assistant Chat</h1>
+                    </div>
                 </div>
 
                 <!-- Messages Container -->
@@ -906,8 +1053,9 @@
                 <!-- Focus Mode Header -->
                 <div class="focus-header">
                     <div class="focus-header-left">
+                        <!-- Updated focus mode icon for better visual consistency -->
                         <svg fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                         </svg>
                         <h2 class="document-title" id="focusDocumentTitle">Focus Mode</h2>
                         <span class="focus-clause-counter" id="focusClauseCounter">Clause 1 of 1</span>
