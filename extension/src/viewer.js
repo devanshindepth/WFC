@@ -57,6 +57,9 @@ class LegalChatApp {
         this.prevClauseBtn = document.getElementById('prevClauseBtn');
         this.nextClauseBtn = document.getElementById('nextClauseBtn');
         this.focusRefreshButton = document.getElementById('focusRefreshButton');
+        
+        // Resize handle
+        this.resizeHandle = document.getElementById('resizeHandle');
     }
 
     attachEventListeners() {
@@ -94,6 +97,70 @@ class LegalChatApp {
                 }
             }
         });
+        
+        // Initialize resize functionality
+        this.initResizeHandle();
+    }
+
+    initResizeHandle() {
+        const chatPanel = document.querySelector('.chat-panel');
+        const documentPanel = document.querySelector('.document-panel');
+        
+        if (this.resizeHandle && chatPanel && documentPanel) {
+            let isResizing = false;
+            
+            this.resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                this.resizeHandle.style.background = '#4a5568';
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                
+                const containerRect = chatPanel.parentElement.getBoundingClientRect();
+                const percentage = (e.clientX - containerRect.left) / containerRect.width * 100;
+                const newChatWidth = Math.min(Math.max(percentage, 20), 80); // Limit between 20% and 80%
+                
+                chatPanel.style.flex = `0 0 ${newChatWidth}%`;
+                documentPanel.style.flex = `0 0 ${100 - newChatWidth}%`;
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                this.resizeHandle.style.background = '#e5e7eb';
+            });
+            
+            // Handle touch events for mobile
+            this.resizeHandle.addEventListener('touchstart', (e) => {
+                isResizing = true;
+                document.body.style.userSelect = 'none';
+                this.resizeHandle.style.background = '#4a5568';
+                e.preventDefault();
+            });
+            
+            document.addEventListener('touchmove', (e) => {
+                if (!isResizing) return;
+                
+                const touch = e.touches[0];
+                const containerRect = chatPanel.parentElement.getBoundingClientRect();
+                const percentage = (touch.clientX - containerRect.left) / containerRect.width * 100;
+                const newChatWidth = Math.min(Math.max(percentage, 20), 80);
+                
+                chatPanel.style.flex = `0 0 ${newChatWidth}%`;
+                documentPanel.style.flex = `0 0 ${100 - newChatWidth}%`;
+            });
+            
+            document.addEventListener('touchend', () => {
+                isResizing = false;
+                document.body.style.userSelect = '';
+                this.resizeHandle.style.background = '#e5e7eb';
+            });
+        }
     }
 
     async init() {
@@ -772,6 +839,12 @@ this.focusClauseContent.innerHTML = `
 
     async sendToAI(message) {
         try {
+            // Include document context if available
+            let contextualMessage = message;
+            if (this.extractedData?.text) {
+                contextualMessage = `Based on this document: "${this.extractedData.title}"\n\nDocument content:\n${this.extractedData.text.substring(0, 2000)}...\n\nUser question: ${message}`;
+            }
+
             const response = await fetch(`${this.API_BASE_URL}${this.AI_ENDPOINT}`, {
                 method: 'POST',
                 headers: {
@@ -781,21 +854,168 @@ this.focusClauseContent.innerHTML = `
                     messages: [
                         {
                             role: 'user',
-                            content: message
+                            content: contextualMessage
                         }
                     ]
                 }),
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                // Try to get error details from response
+                let errorMessage = `Server error: ${response.status}`;
+                try {
+                    const errorText = await response.text();
+                    console.log('Error response text:', errorText);
+                    
+                    // Try to parse as JSON
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.error || errorData.message || errorMessage;
+                    } catch (jsonError) {
+                        // If JSON parsing fails, use the raw text (truncated)
+                        errorMessage = `${response.status} ${response.statusText}: ${errorText.substring(0, 200)}`;
+                    }
+                } catch (e) {
+                    // If we can't read the response at all, use status text
+                    errorMessage = `${response.status} ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
             }
 
-            const data = await response.json();
-            return data.choices?.[0]?.message?.content || data.message || 'Sorry, I could not process your request.';
+            // Check if response is streaming (has readable stream)
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && (contentType.includes('text/plain') || contentType.includes('application/octet-stream'))) {
+                // Handle streaming response from AI SDK
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+                let buffer = '';
+                
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+                        
+                        for (const line of lines) {
+                            if (line.trim()) {
+                                try {
+                                    // Try to parse as AI SDK data stream format
+                                    if (line.startsWith('0:')) {
+                                        const jsonStr = line.substring(2);
+                                        const data = JSON.parse(jsonStr);
+                                        if (data.type === 'text-delta' && data.textDelta) {
+                                            fullResponse += data.textDelta;
+                                        }
+                                    } else if (line.startsWith('data: ')) {
+                                        // Handle Server-Sent Events format
+                                        const jsonStr = line.substring(6);
+                                        if (jsonStr !== '[DONE]') {
+                                            const data = JSON.parse(jsonStr);
+                                            if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
+                                                fullResponse += data.choices[0].delta.content;
+                                            }
+                                        }
+                                    } else {
+                                        // Try to parse as direct JSON
+                                        const data = JSON.parse(line);
+                                        if (data.type === 'text-delta' && data.textDelta) {
+                                            fullResponse += data.textDelta;
+                                        } else if (data.content) {
+                                            fullResponse += data.content;
+                                        } else if (data.text) {
+                                            fullResponse += data.text;
+                                        }
+                                    }
+                                } catch (e) {
+                                    // If JSON parsing fails, check if it's plain text response
+                                    if (line.trim() && !line.startsWith('{') && !line.startsWith('0:') && !line.startsWith('data:')) {
+                                        fullResponse += line + '\n';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Process any remaining buffer
+                    if (buffer.trim()) {
+                        try {
+                            if (buffer.startsWith('0:')) {
+                                const jsonStr = buffer.substring(2);
+                                const data = JSON.parse(jsonStr);
+                                if (data.type === 'text-delta' && data.textDelta) {
+                                    fullResponse += data.textDelta;
+                                }
+                            } else {
+                                const data = JSON.parse(buffer);
+                                if (data.type === 'text-delta' && data.textDelta) {
+                                    fullResponse += data.textDelta;
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore buffer parsing errors
+                        }
+                    }
+                } finally {
+                    reader.releaseLock();
+                }
+                
+                if (fullResponse.trim()) {
+                    return fullResponse.trim();
+                } else {
+                    // If no streaming content found, try to read as regular response
+                    const responseText = await response.text();
+                    if (responseText.trim()) {
+                        return responseText.trim();
+                    }
+                    throw new Error('No response received from AI service');
+                }
+            } else {
+                // Handle regular JSON response (fallback)
+                const responseText = await response.text();
+                console.log('Raw API response:', responseText);
+                
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (jsonError) {
+                    console.error('JSON parsing failed:', jsonError);
+                    console.error('Response text that failed to parse:', responseText);
+                    throw new Error(`Invalid response from server. Response: ${responseText.substring(0, 100)}...`);
+                }
+                
+                // Handle different response formats
+                if (data.choices && data.choices[0] && data.choices[0].message) {
+                    return data.choices[0].message.content;
+                } else if (data.message) {
+                    return data.message;
+                } else if (data.response) {
+                    return data.response;
+                } else if (data.content) {
+                    return data.content;
+                } else {
+                    console.warn('Unexpected API response format:', data);
+                    return 'I received a response but couldn\'t parse it properly. Please try asking your question again.';
+                }
+            }
+            
         } catch (error) {
             console.error('API request failed:', error);
-            throw error;
+            
+            // Provide more helpful error messages with fallback responses
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                throw new Error('Cannot connect to AI service. Please check if the server is running on localhost:3000. \n\nAs a fallback, here\'s some general guidance: Legal documents often contain important terms about your rights, obligations, and potential risks. Consider consulting with a legal professional for specific advice.');
+            } else if (error.message.includes('404')) {
+                throw new Error('AI service endpoint not found. Please check the server configuration.');
+            } else if (error.message.includes('500')) {
+                throw new Error('AI service encountered an internal error. Please try again.');
+            } else {
+                throw new Error(`AI service error: ${error.message}`);
+            }
         }
     }
 
@@ -822,6 +1042,21 @@ this.focusClauseContent.innerHTML = `
         if (isLoading) {
             this.showDocumentLoading();
         }
+    }
+
+    showDocumentLoading() {
+        const loadingHtml = `
+            <div class="loading-document">
+                <div>
+                    <div class="spinner"></div>
+                    <p>Loading document...</p>
+                </div>
+            </div>
+        `;
+        
+        if (this.documentContentElement) this.documentContentElement.innerHTML = loadingHtml;
+        if (this.readDocumentContent) this.readDocumentContent.innerHTML = loadingHtml;
+        if (this.focusClauseContent) this.focusClauseContent.innerHTML = loadingHtml;
     }
 
     renderAllDocumentViews() {
@@ -1191,34 +1426,4 @@ this.focusClauseContent.innerHTML = `
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.legalChatApp = new LegalChatApp();
-    const resizeHandle = document.getElementById('resizeHandle');
-            const chatPanel = document.querySelector('.chat-panel');
-            const documentPanel = document.querySelector('.document-panel');
-            
-            let isResizing = false;
-            
-            resizeHandle.addEventListener('mousedown', function(e) {
-                isResizing = true;
-                document.body.style.cursor = 'col-resize';
-                document.body.style.userSelect = 'none';
-                e.preventDefault();
-            });
-            
-            document.addEventListener('mousemove', function(e) {
-                if (!isResizing) return;
-                
-                const containerRect = chatPanel.parentElement.getBoundingClientRect();
-                const percentage = (e.clientX - containerRect.left) / containerRect.width * 100;
-                const newChatWidth = Math.min(Math.max(percentage, 20), 80); // Limit between 20% and 80%
-                
-                chatPanel.style.flex = `0 0 ${newChatWidth}%`;
-                documentPanel.style.flex = `0 0 ${100 - newChatWidth}%`;
-            });
-            
-            document.addEventListener('mouseup', function() {
-                isResizing = false;
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-            });
-    
 });
