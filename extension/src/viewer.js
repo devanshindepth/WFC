@@ -168,14 +168,16 @@ class LegalChatApp {
             // Ensure we are in a Chrome extension environment
             if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
                 
-                // Fetch all necessary data, including additional metadata
+                // Fetch all necessary data, including terms detection metadata
                 const data = await chrome.storage.local.get([
                     'extractedText', 
                     'extractedTitle', 
                     'timestamp', 
                     'fileName', 
                     'fileType', 
-                    'extractionTimestamp'
+                    'extractionTimestamp',
+                    'sourceUrl',
+                    'termsDetectionData'
                 ]);
                 
                 if (data.extractedText && data.extractedText.trim()) {
@@ -186,7 +188,9 @@ class LegalChatApp {
                         timestamp: data.timestamp || data.extractionTimestamp || Date.now(),
                         fileName: data.fileName,
                         fileType: data.fileType,
-                        extractionTimestamp: data.extractionTimestamp
+                        extractionTimestamp: data.extractionTimestamp,
+                        sourceUrl: data.sourceUrl,
+                        termsDetectionData: data.termsDetectionData
                     };
                     
                     // Create the object with the structure that displayProcessedContent expects
@@ -199,12 +203,19 @@ class LegalChatApp {
                     this.setDocumentTitle(processedDocument.title);
                     this.displayProcessedContent(processedDocument);
 
+                    // If this is terms and conditions data, show a welcome message
+                    // if (data.termsDetectionData) {
+                    //     this.showTermsWelcomeMessage(data.termsDetectionData, data.sourceUrl);
+                    // }
+
                     console.log('Successfully loaded extracted document:', {
                         title: this.extractedData.title,
                         textLength: this.extractedData.text.length,
                         timestamp: new Date(this.extractedData.timestamp).toLocaleString(),
                         fileName: this.extractedData.fileName,
-                        fileType: this.extractedData.fileType
+                        fileType: this.extractedData.fileType,
+                        sourceUrl: this.extractedData.sourceUrl,
+                        hasTermsData: !!data.termsDetectionData
                     });
 
                 } else {
@@ -1068,30 +1079,13 @@ this.focusClauseContent.innerHTML = `
     renderChatDocument() {
         if (!this.documentContentElement) return;
         
-        // Add metadata header if available
-        let metadataHtml = '';
-        if (this.extractedData?.timestamp) {
-            const date = new Date(this.extractedData.timestamp);
-            metadataHtml = `
-                <div class="document-metadata">
-                    <div class="metadata-title">${this.escapeHtml(this.extractedData.title)}</div>
-                    <div class="metadata-info">Extracted on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}</div>
-                    ${this.extractedData.fileName ? `<div class="metadata-file">File: ${this.escapeHtml(this.extractedData.fileName)}</div>` : ''}
-                    ${this.extractedData.fileType ? `<div class="metadata-type">Type: ${this.escapeHtml(this.extractedData.fileType)}</div>` : ''}
-                </div>
-            `;
-        }
-        
-        // Enhanced section rendering with better visual distinction
+        // Simple section rendering without metadata
         const sectionsHtml = this.document.map(section => {
             const sectionClass = section.type === 'heading' ? 'document-section heading-section' : 'document-section content-section';
-            const sectionIcon = section.type === 'heading' ? '' : '';
             
             return `
                 <div class="${sectionClass}" data-section-id="${section.id}">
-                    <div class="section-tooltip">Click to discuss this ${section.type}</div>
                     <div class="section-content">
-                        <div class="section-number">${sectionIcon} ${section.index}</div>
                         <div class="section-text">${this.escapeHtml(section.text)}</div>
                     </div>
                 </div>
@@ -1100,35 +1094,11 @@ this.focusClauseContent.innerHTML = `
 
         this.documentContentElement.innerHTML = `
     <div class="chat-document-container">
-        ${metadataHtml}
         <div class="document-sections">
             ${sectionsHtml}
         </div>
-        <div class="tip-box">
-            <p><strong>Tip:</strong> Click on any numbered section to get an AI explanation. You can also select text and ask questions directly in the chat.</p>
-        </div>
     </div>
     <style>
-        .document-metadata {
-            background: #ffffff;
-            padding: 1rem;
-            border-radius: 0.75rem;
-            margin-bottom: 1.5rem;
-            font-size: 0.875rem;
-            border: 1px solid #e5e7eb;
-            border-left: 4px solid #4b5563;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-        .metadata-title {
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 0.5rem;
-            font-size: 1rem;
-        }
-        .metadata-info, .metadata-file, .metadata-type {
-            color: #374151;
-            margin: 0.25rem 0;
-        }
         .document-sections {
             display: flex;
             flex-direction: column;
@@ -1137,80 +1107,14 @@ this.focusClauseContent.innerHTML = `
         .document-section {
             border: 1px solid #e5e7eb;
             border-radius: 0.5rem;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-        .document-section:hover {
-            border-color: #6b7280;
-            box-shadow: 0 2px 8px rgba(107, 114, 128, 0.15);
-            transform: translateY(-1px);
-        }
-        .heading-section {
-            background: #f9fafb;
-        }
-        .content-section {
             background: #ffffff;
         }
-        .section-tooltip {
-            position: absolute;
-            top: -2rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1f2937;
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
-            white-space: nowrap;
-            z-index: 10;
-        }
-        .document-section:hover .section-tooltip {
-            opacity: 1;
-        }
         .section-content {
-            display: flex;
-            align-items: flex-start;
             padding: 1rem;
-            gap: 0.75rem;
-        }
-        .section-number {
-            flex-shrink: 0;
-            width: 2.5rem;
-            height: 2.5rem;
-            background: #4b5563;
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-        .heading-section .section-number {
-            background: #374151;
         }
         .section-text {
-            flex: 1;
             line-height: 1.6;
             color: #374151;
-        }
-        .tip-box {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            background: #f9fafb;
-            border-radius: 0.5rem;
-            border: 1px solid #e5e7eb;
-            border-left: 4px solid #6b7280;
-        }
-        .tip-box p {
-            margin: 0;
-            color: #374151;
-            font-size: 0.875rem;
         }
     </style>
 `
@@ -1421,6 +1325,99 @@ this.focusClauseContent.innerHTML = `
         div.textContent = text;
         return div.innerHTML;
     }
+
+    // showTermsWelcomeMessage(termsData, sourceUrl) {
+    //     if (!this.welcomeMessage) return;
+
+    //     const welcomeHtml = `
+    //         <div class="terms-welcome-message">
+    //             <div class="welcome-header">
+    //                 <h3>📄 Terms & Conditions Loaded</h3>
+    //                 <p>Ready to analyze the terms and conditions content</p>
+    //             </div>
+
+    //             <div class="suggested-questions">
+    //                 <div class="question-buttons">
+    //                     <button class="question-btn" data-question="What are the main risks in these terms?">
+    //                         🚨 Main Risks
+    //                     </button>
+    //                     <button class="question-btn" data-question="What data do they collect and how is it used?">
+    //                         🔒 Data Usage
+    //                     </button>
+    //                     <button class="question-btn" data-question="What are my rights as a user?">
+    //                         👤 User Rights
+    //                     </button>
+    //                     <button class="question-btn" data-question="Should I accept these terms?">
+    //                         💭 Recommendation
+    //                     </button>
+    //                     <button class="question-btn" data-question="Summarize these terms in simple language.">
+    //                         📝 Simple Summary
+    //                     </button>
+    //                 </div>
+    //             </div>
+    //         </div>
+
+    //         <style>
+    //             .terms-welcome-message {
+    //                 background: #4a5568;
+    //                 color: white;
+    //                 padding: 1.5rem;
+    //                 border-radius: 8px;
+    //                 margin-bottom: 1rem;
+    //             }
+                
+    //             .welcome-header h3 {
+    //                 margin: 0 0 0.5rem 0;
+    //                 font-size: 1.1rem;
+    //                 font-weight: 600;
+    //             }
+                
+    //             .welcome-header p {
+    //                 margin: 0 0 1rem 0;
+    //                 opacity: 0.9;
+    //                 font-size: 0.9rem;
+    //             }
+                
+    //             .question-buttons {
+    //                 display: grid;
+    //                 grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    //                 gap: 0.5rem;
+    //             }
+                
+    //             .question-btn {
+    //                 background: rgba(255, 255, 255, 0.1);
+    //                 border: 1px solid rgba(255, 255, 255, 0.2);
+    //                 color: white;
+    //                 padding: 0.75rem;
+    //                 border-radius: 4px;
+    //                 cursor: pointer;
+    //                 font-size: 0.85rem;
+    //                 transition: all 0.2s ease;
+    //                 text-align: left;
+    //             }
+                
+    //             .question-btn:hover {
+    //                 background: rgba(255, 255, 255, 0.2);
+    //                 border-color: rgba(255, 255, 255, 0.3);
+    //             }
+    //         </style>
+    //     `;
+
+    //     this.welcomeMessage.innerHTML = welcomeHtml;
+    //     this.welcomeMessage.style.display = 'block';
+
+    //     // Add click handlers for suggested questions
+    //     const questionButtons = this.welcomeMessage.querySelectorAll('.question-btn');
+    //     questionButtons.forEach(button => {
+    //         button.addEventListener('click', () => {
+    //             const question = button.getAttribute('data-question');
+    //             if (question) {
+    //                 this.messageInput.value = question;
+    //                 this.handleSendMessage();
+    //             }
+    //         });
+    //     });
+    // }
 }
         
 // Initialize the app when DOM is loaded

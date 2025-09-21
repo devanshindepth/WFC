@@ -676,126 +676,313 @@ class TermsPopup {
       : text;
   }
 
+  formatTermsForChat(data, tab = null) {
+    const { termsLinks, acceptanceElements, termsContent, fullTermsContent } =
+      data;
+
+    let formattedText = "";
+
+    // Add the actual terms content - this is the main content for analysis
+    if (fullTermsContent && fullTermsContent.length > 0) {
+      fullTermsContent.forEach((termDoc, index) => {
+        if (termDoc.content && termDoc.content.trim()) {
+          // Add the full content - this is what the user wants to analyze
+          const cleanContent = termDoc.content.trim();
+
+          // Format the content better for readability
+          const formattedContent = cleanContent
+            .replace(/\n\s*\n\s*\n/g, "\n\n") // Remove excessive line breaks
+            .replace(/^\s+/gm, "") // Remove leading whitespace
+            .replace(/\s+$/gm, "") // Remove trailing whitespace
+            .split("\n\n")
+            .filter((paragraph) => paragraph.trim().length > 10) // Filter out very short paragraphs
+            .map((paragraph) => paragraph.trim())
+            .join("\n\n");
+
+          formattedText += formattedContent;
+
+          // Add separator between multiple documents
+          if (index < fullTermsContent.length - 1) {
+            formattedText += "\n\n---\n\n";
+          }
+        }
+      });
+    } else {
+      // If no full content was extracted, provide minimal information
+      if (termsLinks.length > 0) {
+        formattedText +=
+          "Terms and conditions detected but content could not be extracted automatically.\n\n";
+        termsLinks.forEach((link, index) => {
+          formattedText += `${link.text}: ${link.href}\n`;
+        });
+        formattedText +=
+          "\nPlease copy and paste the terms content you'd like me to analyze.";
+      } else {
+        formattedText +=
+          "No terms and conditions content available for analysis.";
+      }
+    }
+
+    // Get hostname for title only
+    let hostname = "Website";
+    if (tab && tab.url) {
+      try {
+        const url = new URL(tab.url);
+        hostname = url.hostname;
+      } catch (e) {
+        hostname = "Website";
+      }
+    }
+
+    return {
+      text: formattedText,
+      title: `Terms & Conditions - ${hostname}`,
+      timestamp: data.timestamp,
+    };
+  }
+
   async fetchFullTermsContent() {
     const { termsLinks } = this.currentData;
     const fullContent = [];
 
+    if (!termsLinks || termsLinks.length === 0) {
+      console.log("No terms links to fetch content from");
+      return fullContent;
+    }
+
+    console.log(
+      `Attempting to fetch content from ${termsLinks.length} terms links`
+    );
+
     for (const link of termsLinks) {
       try {
         console.log(`Fetching content from: ${link.href}`);
-        
-        // Use chrome.tabs to fetch content from the same origin or handle CORS
+
+        // Get current tab for context
         const tab = await this.getCurrentTab();
-        
+
         // Try to fetch content using content script injection
         try {
           const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             function: (url) => {
-              // Try to fetch the URL content
-              return fetch(url, {
-                method: 'GET',
-                mode: 'cors',
-                credentials: 'same-origin'
-              })
-              .then(response => response.text())
-              .then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Remove script and style elements
-                const scripts = doc.querySelectorAll('script, style, nav, header, footer');
-                scripts.forEach(el => el.remove());
-                
-                // Get main content areas
-                const contentSelectors = [
-                  'main', '[role="main"]', '.content', '.main-content', 
-                  '.terms', '.privacy', '.policy', '.legal', 'article',
-                  '.container', '.wrapper'
-                ];
-                
-                let textContent = '';
-                for (const selector of contentSelectors) {
-                  const element = doc.querySelector(selector);
-                  if (element && element.textContent.trim().length > 500) {
-                    textContent = element.textContent || element.innerText;
-                    break;
-                  }
+              return new Promise((resolve) => {
+                try {
+                  // Try to fetch the URL content
+                  fetch(url, {
+                    method: "GET",
+                    mode: "cors",
+                    credentials: "same-origin",
+                    headers: {
+                      Accept:
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                      "User-Agent": navigator.userAgent,
+                    },
+                  })
+                    .then((response) => {
+                      if (!response.ok) {
+                        throw new Error(
+                          `HTTP ${response.status}: ${response.statusText}`
+                        );
+                      }
+                      return response.text();
+                    })
+                    .then((html) => {
+                      const parser = new DOMParser();
+                      const doc = parser.parseFromString(html, "text/html");
+
+                      // Remove unwanted elements
+                      const unwantedSelectors = [
+                        "script",
+                        "style",
+                        "nav",
+                        "header",
+                        "footer",
+                        ".navigation",
+                        ".nav",
+                        ".menu",
+                        ".sidebar",
+                        ".advertisement",
+                        ".ads",
+                        ".social",
+                        ".share",
+                        "iframe",
+                        "embed",
+                        "object",
+                      ];
+                      unwantedSelectors.forEach((selector) => {
+                        const elements = doc.querySelectorAll(selector);
+                        elements.forEach((el) => el.remove());
+                      });
+
+                      // Try to find main content areas in order of preference
+                      const contentSelectors = [
+                        "main",
+                        '[role="main"]',
+                        ".terms-content",
+                        ".privacy-content",
+                        ".policy-content",
+                        ".legal-content",
+                        ".content-main",
+                        ".main-content",
+                        ".terms",
+                        ".privacy",
+                        ".policy",
+                        ".legal",
+                        "article",
+                        ".article",
+                        ".container .content",
+                        ".wrapper .content",
+                        ".page-content",
+                        ".document-content",
+                        ".container",
+                        ".wrapper",
+                      ];
+
+                      let textContent = "";
+                      let bestElement = null;
+                      let maxLength = 0;
+
+                      // Find the element with the most substantial content
+                      for (const selector of contentSelectors) {
+                        const elements = doc.querySelectorAll(selector);
+                        for (const element of elements) {
+                          const elementText =
+                            element.textContent || element.innerText || "";
+                          if (
+                            elementText.trim().length > maxLength &&
+                            elementText.trim().length > 200
+                          ) {
+                            maxLength = elementText.trim().length;
+                            bestElement = element;
+                            textContent = elementText;
+                          }
+                        }
+                        if (bestElement) break;
+                      }
+
+                      // Fallback to body content if no main content found
+                      if (!textContent || textContent.trim().length < 200) {
+                        textContent =
+                          doc.body.textContent || doc.body.innerText || "";
+                      }
+
+                      // Clean up the text
+                      if (textContent) {
+                        textContent = textContent
+                          .replace(/\s+/g, " ") // Normalize whitespace
+                          .replace(/\n\s*\n\s*\n/g, "\n\n") // Remove excessive line breaks
+                          .replace(/^\s+|\s+$/gm, "") // Trim lines
+                          .trim();
+                      }
+
+                      resolve(textContent);
+                    })
+                    .catch((error) => {
+                      console.error("Fetch error:", error);
+                      resolve(null);
+                    });
+                } catch (error) {
+                  console.error("Content extraction error:", error);
+                  resolve(null);
                 }
-                
-                // Fallback to body content if no main content found
-                if (!textContent || textContent.trim().length < 100) {
-                  textContent = doc.body.textContent || doc.body.innerText || '';
-                }
-                
-                // Clean up the text
-                return textContent
-                  .replace(/\s+/g, ' ')
-                  .replace(/\n\s*\n/g, '\n\n')
-                  .trim();
-              })
-              .catch(error => {
-                console.error('Fetch error:', error);
-                return null;
               });
             },
-            args: [link.href]
+            args: [link.href],
           });
-          
+
           const textContent = await results[0]?.result;
-          
-          if (textContent && textContent.trim().length > 50) {
+
+          if (textContent && textContent.trim().length > 100) {
             fullContent.push({
-              title: link.text,
+              title: link.text || "Terms Document",
               url: link.href,
               content: textContent.trim(),
             });
-            console.log(`Successfully extracted ${textContent.length} characters from ${link.href}`);
+            console.log(
+              `Successfully extracted ${textContent.length} characters from ${link.href}`
+            );
           } else {
-            console.warn(`No content extracted from ${link.href}`);
-            // Add placeholder with link info
+            console.warn(
+              `Insufficient content extracted from ${link.href} (${
+                textContent?.length || 0
+              } chars)`
+            );
+
+            // Add placeholder with link info for manual review
             fullContent.push({
-              title: link.text,
+              title: link.text || "Terms Document",
               url: link.href,
-              content: `Terms and Conditions document available at: ${link.href}\n\nPlease visit the link above to read the full terms and conditions.`,
+              content: `Terms and Conditions Document: ${
+                link.text || "Untitled"
+              }\n\nSource URL: ${
+                link.href
+              }\n\nNote: The full content could not be automatically extracted due to technical limitations (CORS policy, dynamic content, or access restrictions). Please visit the link above to read the complete terms and conditions.\n\nYou can copy and paste specific sections from the document into this chat for detailed analysis.`,
             });
           }
         } catch (scriptError) {
-          console.error(`Script injection failed for ${link.href}:`, scriptError);
-          
-          // Fallback: add link information
+          console.error(
+            `Script injection failed for ${link.href}:`,
+            scriptError
+          );
+
+          // Add informative placeholder
           fullContent.push({
-            title: link.text,
+            title: link.text || "Terms Document",
             url: link.href,
-            content: `Terms and Conditions: ${link.text}\n\nDocument URL: ${link.href}\n\nNote: Content could not be automatically extracted. Please visit the link to read the full terms.`,
+            content: `Terms and Conditions Document: ${
+              link.text || "Untitled"
+            }\n\nSource URL: ${
+              link.href
+            }\n\nNote: Content extraction failed due to browser security restrictions. This is common with cross-origin requests. Please visit the link to read the full terms and conditions.\n\nFor analysis, you can copy and paste specific sections from the document into this chat.`,
           });
         }
       } catch (error) {
         console.error(`Failed to process ${link.href}:`, error);
-        
-        // Add error placeholder
+
+        // Add error placeholder with helpful information
         fullContent.push({
-          title: link.text,
+          title: link.text || "Terms Document",
           url: link.href,
-          content: `Terms and Conditions: ${link.text}\n\nDocument URL: ${link.href}\n\nNote: Content extraction failed. Please visit the link manually.`,
+          content: `Terms and Conditions Document: ${
+            link.text || "Untitled"
+          }\n\nSource URL: ${
+            link.href
+          }\n\nNote: Unable to extract content automatically. Please visit the link manually to review the terms and conditions.\n\nIf you need help analyzing specific clauses, feel free to copy and paste them into this chat for detailed explanation.`,
         });
       }
     }
 
+    console.log(
+      `Content extraction completed. Successfully extracted content from ${
+        fullContent.filter((doc) => doc.content && doc.content.length > 500)
+          .length
+      } out of ${termsLinks.length} links.`
+    );
     return fullContent;
   }
 
   async openChatInterface() {
     if (!this.currentData) {
       console.error("No terms data available to open chat");
+      alert(
+        "No terms and conditions detected on this page. Please refresh and try again."
+      );
       return;
     }
 
     try {
+      // Show loading state
+      const openBtn = document.getElementById("openChatBtn");
+      const originalText = openBtn.textContent;
+      openBtn.textContent = "Opening Chat...";
+      openBtn.disabled = true;
+
       // Get current tab info for better context
       const tab = await this.getCurrentTab();
 
       // Fetch full terms content from the detected links
+      console.log("Fetching full terms content...");
       const fullTermsContent = await this.fetchFullTermsContent();
 
       // Format the terms data for the chat interface
@@ -807,6 +994,14 @@ class TermsPopup {
         tab
       );
 
+      // Ensure we have meaningful content to analyze
+      if (
+        !formattedTermsData.text ||
+        formattedTermsData.text.trim().length < 100
+      ) {
+        throw new Error("Insufficient terms content extracted for analysis");
+      }
+
       // Store the formatted terms data in chrome storage for the viewer to access
       await chrome.storage.local.set({
         extractedText: formattedTermsData.text,
@@ -816,16 +1011,29 @@ class TermsPopup {
         fileType: "text/plain",
         extractionTimestamp: this.currentData.timestamp,
         sourceUrl: tab?.url || "Unknown",
+        termsDetectionData: {
+          termsLinks: this.currentData.termsLinks,
+          acceptanceElements: this.currentData.acceptanceElements,
+          hasTermsAndAcceptance: this.currentData.hasTermsAndAcceptance,
+          detectionTimestamp: this.currentData.timestamp,
+        },
+      });
+
+      console.log("Terms data stored successfully:", {
+        textLength: formattedTermsData.text.length,
+        title: formattedTermsData.title,
+        termsLinks: this.currentData.termsLinks.length,
+        acceptanceElements: this.currentData.acceptanceElements.length,
       });
 
       // Open the viewer window (chat interface)
       const viewerWindow = await chrome.windows.create({
         url: chrome.runtime.getURL("viewer.html"),
         type: "popup",
-        width: 1000,
-        height: 700,
-        left: Math.max(0, Math.round((screen.width - 1000) / 2)),
-        top: Math.max(0, Math.round((screen.height - 700) / 2)),
+        width: 1200,
+        height: 800,
+        left: Math.max(0, Math.round((screen.width - 1200) / 2)),
+        top: Math.max(0, Math.round((screen.height - 800) / 2)),
         focused: true,
       });
 
@@ -833,11 +1041,33 @@ class TermsPopup {
         console.log(
           `Chat interface opened successfully with ID: ${viewerWindow.id}`
         );
+
+        // Reset button state
+        openBtn.textContent = originalText;
+        openBtn.disabled = false;
       } else {
         throw new Error("Failed to create chat interface window");
       }
     } catch (error) {
       console.error("Error opening chat interface:", error);
+
+      // Reset button state
+      const openBtn = document.getElementById("openChatBtn");
+      openBtn.textContent = "Open Chat";
+      openBtn.disabled = false;
+
+      // Show user-friendly error message
+      let errorMessage = "Could not open chat interface. ";
+      if (error.message.includes("Insufficient terms content")) {
+        errorMessage +=
+          "The detected terms content is too short for analysis. Please try a different page.";
+      } else if (error.message.includes("Failed to create")) {
+        errorMessage += "Please check if popups are blocked and try again.";
+      } else {
+        errorMessage += "Please try refreshing the extension.";
+      }
+
+      alert(errorMessage);
 
       // Fallback: try to open in a new tab
       try {
@@ -848,15 +1078,13 @@ class TermsPopup {
         console.log("Chat interface opened in new tab as fallback");
       } catch (tabError) {
         console.error("Error opening chat interface tab:", tabError);
-        alert(
-          "Could not open chat interface. Please try refreshing the extension."
-        );
       }
     }
   }
 
   formatTermsForChat(data, tab = null) {
-    const { termsLinks, acceptanceElements, termsContent, fullTermsContent } = data;
+    const { termsLinks, acceptanceElements, termsContent, fullTermsContent } =
+      data;
 
     let formattedText = "# Terms & Conditions Document\n\n";
 
@@ -875,7 +1103,9 @@ class TermsPopup {
 
     formattedText += `**Source Website:** ${hostname}\n`;
     formattedText += `**Page URL:** ${pageUrl}\n`;
-    formattedText += `**Extraction Time:** ${new Date(data.timestamp).toLocaleString()}\n\n`;
+    formattedText += `**Extraction Time:** ${new Date(
+      data.timestamp
+    ).toLocaleString()}\n\n`;
 
     formattedText += "---\n\n";
 
@@ -883,13 +1113,18 @@ class TermsPopup {
     formattedText += "## 📊 Document Summary\n\n";
     formattedText += `🔗 **Terms Documents Found:** ${termsLinks.length}\n`;
     formattedText += `✅ **Acceptance Elements:** ${acceptanceElements.length}\n`;
-    
+
     if (fullTermsContent && fullTermsContent.length > 0) {
-      const totalChars = fullTermsContent.reduce((sum, doc) => sum + (doc.content?.length || 0), 0);
+      const totalChars = fullTermsContent.reduce(
+        (sum, doc) => sum + (doc.content?.length || 0),
+        0
+      );
       formattedText += `📄 **Total Content Length:** ${totalChars.toLocaleString()} characters\n`;
     }
-    
-    formattedText += `⚠️ **Requires User Acceptance:** ${data.hasTermsAndAcceptance ? "Yes" : "No"}\n\n`;
+
+    formattedText += `⚠️ **Requires User Acceptance:** ${
+      data.hasTermsAndAcceptance ? "Yes" : "No"
+    }\n\n`;
 
     // Add the actual terms content - this is the main content for analysis
     if (fullTermsContent && fullTermsContent.length > 0) {
@@ -902,18 +1137,18 @@ class TermsPopup {
 
           // Add the full content - this is what the user wants to analyze
           const cleanContent = termDoc.content.trim();
-          
+
           // Format the content better for readability
           const formattedContent = cleanContent
-            .replace(/\n\s*\n\s*\n/g, '\n\n') // Remove excessive line breaks
-            .replace(/^\s+/gm, '') // Remove leading whitespace
-            .replace(/\s+$/gm, '') // Remove trailing whitespace
-            .split('\n\n')
-            .filter(paragraph => paragraph.trim().length > 10) // Filter out very short paragraphs
-            .join('\n\n');
+            .replace(/\n\s*\n\s*\n/g, "\n\n") // Remove excessive line breaks
+            .replace(/^\s+/gm, "") // Remove leading whitespace
+            .replace(/\s+$/gm, "") // Remove trailing whitespace
+            .split("\n\n")
+            .filter((paragraph) => paragraph.trim().length > 10) // Filter out very short paragraphs
+            .join("\n\n");
 
           formattedText += `${formattedContent}\n\n`;
-          
+
           formattedText += `*Document length: ${cleanContent.length.toLocaleString()} characters*\n\n`;
           formattedText += "---\n\n";
         }
@@ -957,7 +1192,8 @@ class TermsPopup {
     // Add helpful context for the AI
     formattedText += "---\n\n";
     formattedText += "## 💡 Analysis Instructions\n\n";
-    formattedText += "This document contains terms and conditions extracted from a website. ";
+    formattedText +=
+      "This document contains terms and conditions extracted from a website. ";
     formattedText += "Please help analyze this content for:\n\n";
     formattedText += "- **Privacy and data collection practices**\n";
     formattedText += "- **User rights and obligations**\n";
@@ -965,7 +1201,8 @@ class TermsPopup {
     formattedText += "- **Liability and risk clauses**\n";
     formattedText += "- **Important restrictions or limitations**\n";
     formattedText += "- **Potential red flags or concerning clauses**\n\n";
-    formattedText += "Focus on providing clear, user-friendly explanations of complex legal language.\n\n";
+    formattedText +=
+      "Focus on providing clear, user-friendly explanations of complex legal language.\n\n";
 
     return {
       text: formattedText,
